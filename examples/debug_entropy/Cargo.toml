@@ -1,0 +1,13 @@
+[package]
+name = "saddle-procgen-wfc-example-debug-entropy"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bevy = { workspace = true }
+saddle-procgen-wfc = { workspace = true }
+saddle-procgen-wfc-example-support = { path = "../support" }
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "support",
+    "basic_2d",
+    "constrained_room",
+    "voxel_3d",
+    "async_runtime",
+    "debug_entropy",
+    "lab",
+]
+resolver = "3"
+
+[workspace.dependencies]
+bevy = { version = "0.18", features = ["serialize"] }
+saddle-procgen-wfc = { path = ".." }
+
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"

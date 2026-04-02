@@ -1,0 +1,20 @@
+[package]
+name = "saddle-procgen-wfc"
+version = "0.1.0"
+edition = "2024"
+publish = false
+repository = "https://github.com/julien-blanchon/saddle-procgen-wfc"
+license = "MIT-0"
+description = "Wave Function Collapse / Model Synthesis toolkit for reusable tile and voxel constraint solving in Bevy"
+
+[dependencies]
+bevy = { version = "0.18", features = ["serialize"] }
+rand = "0.9"
+rand_chacha = "0.9"
+
+[workspace]
+
+[lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"
