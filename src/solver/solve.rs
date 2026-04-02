@@ -1,4 +1,4 @@
-use std::time::Instant;
+use bevy::platform::time::Instant;
 
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;

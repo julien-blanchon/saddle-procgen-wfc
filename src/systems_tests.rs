@@ -153,7 +153,7 @@ fn failed_jobs_emit_failure_message_without_blocking_updates() {
             label: Some("runtime failure".into()),
         });
 
-    let start = std::time::Instant::now();
+    let start = bevy::platform::time::Instant::now();
     for _ in 0..256 {
         app.update();
         let failed_messages = app.world().resource::<Messages<WfcFailed>>();
