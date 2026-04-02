@@ -61,7 +61,7 @@ fn main() {
 }
 
 fn request_generation(mut writer: MessageWriter<GenerateWfc>) {
-    # use wfc::{WfcDirection, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcTileDefinition, WfcTileId, WfcTopology};
+    # use saddle_procgen_wfc::{WfcDirection, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcTileDefinition, WfcTileId, WfcTopology};
     # let a = WfcTileId(0);
     # let ruleset = WfcRuleset::new(
     #     WfcTopology::Cartesian2d,

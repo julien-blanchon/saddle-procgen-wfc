@@ -12,6 +12,9 @@ bevy = { version = "0.18", features = ["serialize"] }
 rand = "0.9"
 rand_chacha = "0.9"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
 [workspace]
 
 [lints.clippy]
