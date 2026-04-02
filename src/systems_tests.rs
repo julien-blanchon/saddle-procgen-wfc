@@ -88,8 +88,18 @@ fn request_spawns_job_and_emits_success_messages() {
         entity
     };
 
+    // Collect progress messages during polling to avoid buffer expiry over many frames.
+    let mut all_progress: Vec<WfcProgress> = {
+        let progress_messages = app.world().resource::<Messages<WfcProgress>>();
+        progress_cursor.read(progress_messages).cloned().collect()
+    };
+
     for _ in 0..256 {
         app.update();
+        {
+            let progress_messages = app.world().resource::<Messages<WfcProgress>>();
+            all_progress.extend(progress_cursor.read(progress_messages).cloned());
+        }
         if app
             .world()
             .entity(job_entity)
@@ -119,15 +129,13 @@ fn request_spawns_job_and_emits_success_messages() {
     let solved: Vec<_> = solved_cursor.read(solved_messages).cloned().collect();
     assert_eq!(solved.len(), 1);
 
-    let progress_messages = app.world().resource::<Messages<WfcProgress>>();
-    let progress: Vec<_> = progress_cursor.read(progress_messages).cloned().collect();
     assert!(
-        progress
+        all_progress
             .iter()
             .any(|message| message.status == WfcJobStatus::Running)
     );
     assert!(
-        progress
+        all_progress
             .iter()
             .any(|message| message.status == WfcJobStatus::Succeeded)
     );
