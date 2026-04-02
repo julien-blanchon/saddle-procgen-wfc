@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-use std::borrow::Cow;
-use std::time::Duration;
 use saddle_procgen_wfc::{
     WfcBorder, WfcBorderConstraint, WfcDirection, WfcFixedCell, WfcGlobalConstraint, WfcGridSize,
     WfcRequest, WfcRuleset, WfcSeed, WfcSettings, WfcTileCountConstraint, WfcTileDefinition,
     WfcTileId, WfcTopology,
 };
+use std::borrow::Cow;
+use std::time::Duration;
 
 #[derive(Resource)]
 pub struct ExampleExitTimer(pub Timer);

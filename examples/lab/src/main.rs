@@ -503,7 +503,10 @@ fn layout_for_grid(size: saddle_procgen_wfc::WfcGridSize) -> (f32, Vec2) {
     (tile_size, origin)
 }
 
-fn marker_text_for_tile(view: LabView, tile: saddle_procgen_wfc::WfcTileId) -> Option<&'static str> {
+fn marker_text_for_tile(
+    view: LabView,
+    tile: saddle_procgen_wfc::WfcTileId,
+) -> Option<&'static str> {
     match (view, tile.0) {
         (LabView::Room, 2) => Some("IN"),
         (LabView::Room, 3) => Some("OUT"),
