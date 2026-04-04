@@ -5,9 +5,7 @@ fn sample_patchwork() -> WfcTileGrid {
     let road = WfcTileId(1);
     let water = WfcTileId(2);
     let tiles = vec![
-        meadow, road, road, meadow,
-        meadow, road, water, water,
-        meadow, meadow, water, meadow,
+        meadow, road, road, meadow, meadow, road, water, water, meadow, meadow, water, meadow,
         road, road, meadow, meadow,
     ];
     WfcTileGrid {
@@ -32,11 +30,13 @@ fn overlap_solver_learns_patterns_from_a_sample() {
     let solution = solve_overlap_wfc_2d(&request).expect("overlap solve should succeed");
     assert_eq!(solution.grid.size, WfcGridSize::new_2d(8, 8));
     assert_eq!(solution.grid.tiles.len(), 64);
-    assert!(solution
-        .grid
-        .tiles
-        .iter()
-        .all(|tile| request.sample.tiles.contains(tile)));
+    assert!(
+        solution
+            .grid
+            .tiles
+            .iter()
+            .all(|tile| request.sample.tiles.contains(tile))
+    );
 
     let again = solve_overlap_wfc_2d(&request).expect("same seed should stay deterministic");
     assert_eq!(solution.signature, again.signature);

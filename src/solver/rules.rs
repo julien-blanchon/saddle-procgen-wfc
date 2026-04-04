@@ -45,7 +45,9 @@ impl CompiledRuleset {
             {
                 return Err(format!("duplicate tile id {:?}", tile.id));
             }
-            if ruleset.topology != WfcTopology::Cartesian2d && tile.symmetry != WfcTileSymmetry::Fixed {
+            if ruleset.topology != WfcTopology::Cartesian2d
+                && tile.symmetry != WfcTileSymmetry::Fixed
+            {
                 return Err(format!(
                     "tile {:?} uses {:?}, but automatic rotation currently supports only Cartesian2d",
                     tile.id, tile.symmetry

@@ -5,8 +5,7 @@ use bevy::prelude::*;
 use crate::{
     WfcBoundaryStitching, WfcDirection, WfcFailure, WfcFailureReason, WfcGridSize, WfcRequest,
     WfcRuleset, WfcSeed, WfcSettings, WfcSolution, WfcTileDefinition, WfcTileGrid, WfcTileId,
-    WfcTileVariant, WfcTopology,
-    solver::solve_wfc,
+    WfcTileVariant, WfcTopology, solver::solve_wfc,
 };
 
 #[derive(Clone, Debug, PartialEq, Reflect)]
@@ -59,8 +58,7 @@ pub fn solve_overlap_wfc_2d(request: &WfcOverlapRequest) -> Result<WfcSolution, 
     validate_request(request)?;
     let compiled = compile_patterns(request)?;
 
-    let mut inner_request =
-        WfcRequest::new(request.output_size, compiled.ruleset, request.seed);
+    let mut inner_request = WfcRequest::new(request.output_size, compiled.ruleset, request.seed);
     inner_request.settings = request.settings.clone();
     inner_request.boundary_stitching = if request.options.periodic_output {
         WfcBoundaryStitching::xy()
@@ -192,7 +190,10 @@ fn compile_patterns(request: &WfcOverlapRequest) -> Result<CompiledOverlapModel,
     ];
     let pattern_keys = counts.keys().cloned().collect::<Vec<_>>();
     let mut patterns = Vec::with_capacity(pattern_keys.len());
-    let mut ruleset = WfcRuleset::new(WfcTopology::Cartesian2d, Vec::with_capacity(pattern_keys.len()));
+    let mut ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        Vec::with_capacity(pattern_keys.len()),
+    );
 
     for (index, key) in pattern_keys.iter().enumerate() {
         let anchor = key
