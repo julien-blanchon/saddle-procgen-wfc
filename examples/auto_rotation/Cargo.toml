@@ -1,5 +1,5 @@
 [package]
-name = "saddle-procgen-wfc-example-async-runtime"
+name = "saddle-procgen-wfc-example-auto-rotation"
 version = "0.1.0"
 edition = "2024"
 publish = false

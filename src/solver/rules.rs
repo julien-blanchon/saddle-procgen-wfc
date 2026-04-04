@@ -1,14 +1,20 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{WfcDirection, WfcRuleset, WfcTileId, WfcTopology};
+use crate::{WfcDirection, WfcRuleset, WfcTileId, WfcTileSymmetry, WfcTileVariant, WfcTopology};
 
 use super::bitset::DomainBits;
+
+#[derive(Clone, Copy, Debug)]
+struct CompiledTileVariantEntry {
+    tile_id: WfcTileId,
+    rotation_steps: u8,
+}
 
 #[derive(Clone, Debug)]
 pub struct CompiledRuleset {
     topology: WfcTopology,
-    tile_ids: Vec<WfcTileId>,
-    tile_indices: BTreeMap<WfcTileId, usize>,
+    variants: Vec<CompiledTileVariantEntry>,
+    tile_variants: BTreeMap<WfcTileId, Vec<usize>>,
     weights: Vec<f32>,
     allowed: Vec<Vec<DomainBits>>,
 }
@@ -19,28 +25,54 @@ impl CompiledRuleset {
             return Err("ruleset must contain at least one tile".to_string());
         }
 
-        let mut tile_ids = Vec::with_capacity(ruleset.tiles.len());
-        let mut tile_indices = BTreeMap::new();
-        let mut weights = Vec::with_capacity(ruleset.tiles.len());
+        let directions = WfcDirection::active(ruleset.topology);
+        let mut base_tile_indices = BTreeMap::new();
+        let mut symmetries = Vec::with_capacity(ruleset.tiles.len());
+        let mut variants = Vec::new();
+        let mut tile_variants = BTreeMap::new();
+        let mut weights = Vec::new();
 
-        for (index, tile) in ruleset.tiles.iter().enumerate() {
+        for tile in &ruleset.tiles {
             if !tile.weight.is_finite() || tile.weight <= 0.0 {
                 return Err(format!(
                     "tile {:?} must have a finite positive weight",
                     tile.id
                 ));
             }
-            if tile_indices.insert(tile.id, index).is_some() {
+            if base_tile_indices
+                .insert(tile.id, symmetries.len())
+                .is_some()
+            {
                 return Err(format!("duplicate tile id {:?}", tile.id));
             }
-            tile_ids.push(tile.id);
-            weights.push(tile.weight);
+            if ruleset.topology == WfcTopology::Cartesian3d
+                && tile.symmetry != WfcTileSymmetry::Fixed
+            {
+                return Err(format!(
+                    "tile {:?} uses {:?}, but automatic rotation currently supports only Cartesian2d",
+                    tile.id, tile.symmetry
+                ));
+            }
+
+            let unique_rotations = tile.symmetry.unique_rotations(ruleset.topology);
+            let variant_weight = tile.weight / unique_rotations as f32;
+            let mut variant_indices = Vec::with_capacity(unique_rotations as usize);
+            for rotation_steps in 0..unique_rotations {
+                let variant_index = variants.len();
+                variants.push(CompiledTileVariantEntry {
+                    tile_id: tile.id,
+                    rotation_steps,
+                });
+                weights.push(variant_weight);
+                variant_indices.push(variant_index);
+            }
+            tile_variants.insert(tile.id, variant_indices);
+            symmetries.push(tile.symmetry);
         }
 
-        let directions = WfcDirection::active(ruleset.topology);
-        let tile_count = tile_ids.len();
-        let mut allowed = vec![vec![DomainBits::empty(tile_count); tile_count]; directions.len()];
-        let mut provided = vec![vec![false; tile_count]; directions.len()];
+        let mut canonical_allowed =
+            vec![vec![BTreeSet::<WfcTileId>::new(); ruleset.tiles.len()]; directions.len()];
+        let mut provided = vec![vec![false; ruleset.tiles.len()]; directions.len()];
 
         for rule in &ruleset.adjacency {
             let Some(direction_index) = directions.iter().position(|dir| *dir == rule.direction)
@@ -50,47 +82,95 @@ impl CompiledRuleset {
                     rule.direction, ruleset.topology
                 ));
             };
-            let Some(&tile_index) = tile_indices.get(&rule.tile) else {
+            let Some(&tile_index) = base_tile_indices.get(&rule.tile) else {
                 return Err(format!(
                     "adjacency rule references unknown tile {:?}",
                     rule.tile
                 ));
             };
-            let mut mask = DomainBits::empty(tile_count);
+
             for allowed_tile in &rule.allowed_tiles {
-                let Some(&allowed_index) = tile_indices.get(allowed_tile) else {
+                if !base_tile_indices.contains_key(allowed_tile) {
                     return Err(format!(
                         "adjacency rule references unknown allowed tile {:?}",
                         allowed_tile
                     ));
-                };
-                mask.insert(allowed_index);
+                }
+                canonical_allowed[direction_index][tile_index].insert(*allowed_tile);
             }
-            allowed[direction_index][tile_index].or_assign(&mask);
             provided[direction_index][tile_index] = true;
         }
 
         for (direction_index, direction) in directions.iter().enumerate() {
-            for tile_index in 0..tile_count {
+            for tile_index in 0..ruleset.tiles.len() {
                 if !provided[direction_index][tile_index] {
                     return Err(format!(
                         "missing adjacency rule for tile {:?} in direction {:?}",
-                        tile_ids[tile_index], direction
+                        ruleset.tiles[tile_index].id, direction
                     ));
                 }
-                if allowed[direction_index][tile_index].is_empty() {
+                if canonical_allowed[direction_index][tile_index].is_empty() {
                     return Err(format!(
                         "tile {:?} has no valid neighbors in direction {:?}",
-                        tile_ids[tile_index], direction
+                        ruleset.tiles[tile_index].id, direction
                     ));
+                }
+            }
+        }
+
+        let variant_count = variants.len();
+        let mut allowed =
+            vec![vec![DomainBits::empty(variant_count); variant_count]; directions.len()];
+
+        for tile in &ruleset.tiles {
+            let source_variants = tile_variants
+                .get(&tile.id)
+                .expect("tile variants should exist for every tile");
+            let source_tile_index = base_tile_indices[&tile.id];
+
+            for &variant_index in source_variants {
+                let rotation_steps = variants[variant_index].rotation_steps;
+                for (world_direction_index, world_direction) in directions.iter().enumerate() {
+                    let canonical_direction = inverse_rotate_direction(
+                        *world_direction,
+                        rotation_steps,
+                        ruleset.topology,
+                    );
+                    let canonical_direction_index = directions
+                        .iter()
+                        .position(|direction| *direction == canonical_direction)
+                        .expect("canonical direction should stay active");
+
+                    let mut mask = DomainBits::empty(variant_count);
+                    for allowed_tile_id in
+                        &canonical_allowed[canonical_direction_index][source_tile_index]
+                    {
+                        let allowed_variant = rotated_variant_index(
+                            *allowed_tile_id,
+                            rotation_steps,
+                            ruleset.topology,
+                            &tile_variants,
+                            &symmetries,
+                            &base_tile_indices,
+                        )?;
+                        mask.insert(allowed_variant);
+                    }
+
+                    if mask.is_empty() {
+                        return Err(format!(
+                            "tile {:?} rotation {} has no valid neighbors in direction {:?}",
+                            tile.id, rotation_steps, world_direction
+                        ));
+                    }
+                    allowed[world_direction_index][variant_index] = mask;
                 }
             }
         }
 
         Ok(Self {
             topology: ruleset.topology,
-            tile_ids,
-            tile_indices,
+            variants,
+            tile_variants,
             weights,
             allowed,
         })
@@ -101,15 +181,28 @@ impl CompiledRuleset {
     }
 
     pub fn tile_count(&self) -> usize {
-        self.tile_ids.len()
-    }
-
-    pub fn tile_index(&self, tile_id: WfcTileId) -> Option<usize> {
-        self.tile_indices.get(&tile_id).copied()
+        self.variants.len()
     }
 
     pub fn tile_id(&self, index: usize) -> WfcTileId {
-        self.tile_ids[index]
+        self.variants[index].tile_id
+    }
+
+    pub fn tile_rotation(&self, index: usize) -> u8 {
+        self.variants[index].rotation_steps
+    }
+
+    pub fn tile_variant(&self, index: usize) -> WfcTileVariant {
+        WfcTileVariant::new(self.tile_id(index), self.tile_rotation(index))
+    }
+
+    #[cfg(test)]
+    pub fn variant_index(&self, tile_id: WfcTileId, rotation_steps: u8) -> Option<usize> {
+        let variants = self.tile_variants.get(&tile_id)?;
+        let unique_rotations = variants.len().max(1) as u8;
+        variants
+            .get((rotation_steps % unique_rotations) as usize)
+            .copied()
     }
 
     pub fn weight(&self, index: usize) -> f32 {
@@ -123,10 +216,12 @@ impl CompiledRuleset {
     pub fn mask_for_tiles(&self, tile_ids: &[WfcTileId]) -> Result<DomainBits, String> {
         let mut mask = DomainBits::empty(self.tile_count());
         for tile_id in tile_ids {
-            let Some(index) = self.tile_index(*tile_id) else {
+            let Some(indices) = self.tile_variants.get(tile_id) else {
                 return Err(format!("unknown tile id {:?}", tile_id));
             };
-            mask.insert(index);
+            for index in indices {
+                mask.insert(*index);
+            }
         }
         Ok(mask)
     }
@@ -138,5 +233,51 @@ impl CompiledRuleset {
             .position(|dir| *dir == direction)
             .expect("direction should be active for topology");
         &self.allowed[direction_index][tile_index]
+    }
+}
+
+fn rotated_variant_index(
+    tile_id: WfcTileId,
+    rotation_steps: u8,
+    topology: WfcTopology,
+    tile_variants: &BTreeMap<WfcTileId, Vec<usize>>,
+    symmetries: &[WfcTileSymmetry],
+    base_tile_indices: &BTreeMap<WfcTileId, usize>,
+) -> Result<usize, String> {
+    let Some(base_tile_index) = base_tile_indices.get(&tile_id) else {
+        return Err(format!("unknown tile id {:?}", tile_id));
+    };
+    let unique_rotations = symmetries[*base_tile_index].unique_rotations(topology);
+    let mapped_rotation = rotation_steps % unique_rotations.max(1);
+    tile_variants
+        .get(&tile_id)
+        .and_then(|variants| variants.get(mapped_rotation as usize))
+        .copied()
+        .ok_or_else(|| format!("tile {:?} has no rotation {}", tile_id, mapped_rotation))
+}
+
+fn inverse_rotate_direction(
+    direction: WfcDirection,
+    rotation_steps: u8,
+    topology: WfcTopology,
+) -> WfcDirection {
+    if topology != WfcTopology::Cartesian2d {
+        return direction;
+    }
+
+    let mut rotated = direction;
+    for _ in 0..(4 - rotation_steps % 4) % 4 {
+        rotated = rotate_direction_clockwise(rotated);
+    }
+    rotated
+}
+
+fn rotate_direction_clockwise(direction: WfcDirection) -> WfcDirection {
+    match direction {
+        WfcDirection::XPos => WfcDirection::YNeg,
+        WfcDirection::YNeg => WfcDirection::XNeg,
+        WfcDirection::XNeg => WfcDirection::YPos,
+        WfcDirection::YPos => WfcDirection::XPos,
+        WfcDirection::ZPos | WfcDirection::ZNeg => direction,
     }
 }

@@ -49,6 +49,33 @@ fn flexible_rules_2d() -> WfcRuleset {
     .with_rule(water, WfcDirection::YNeg, [grass, water])
 }
 
+fn autorotation_rules_2d() -> WfcRuleset {
+    let meadow = WfcTileId(0);
+    let straight = WfcTileId(1);
+    let corner = WfcTileId(2);
+    WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(meadow, 3.0, "Meadow"),
+            WfcTileDefinition::new(straight, 1.0, "Straight")
+                .with_symmetry(WfcTileSymmetry::Rotate2),
+            WfcTileDefinition::new(corner, 1.0, "Corner").with_symmetry(WfcTileSymmetry::Rotate4),
+        ],
+    )
+    .with_rule(meadow, WfcDirection::XPos, [meadow, straight, corner])
+    .with_rule(meadow, WfcDirection::XNeg, [meadow, straight, corner])
+    .with_rule(meadow, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(meadow, WfcDirection::YNeg, [meadow, straight, corner])
+    .with_rule(straight, WfcDirection::XPos, [meadow])
+    .with_rule(straight, WfcDirection::XNeg, [meadow])
+    .with_rule(straight, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(straight, WfcDirection::YNeg, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::XPos, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::XNeg, [meadow])
+    .with_rule(corner, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::YNeg, [meadow])
+}
+
 fn stacked_rules_3d() -> WfcRuleset {
     let air = WfcTileId(0);
     let stone = WfcTileId(1);
@@ -114,7 +141,13 @@ fn verify_solution(request: &WfcRequest, solution: &WfcSolution) {
             .grid
             .tile_at(position)
             .expect("solution should contain every cell");
-        let tile_index = rules.tile_index(tile).expect("solution tile should exist");
+        let rotation = solution
+            .grid
+            .rotation_at(position)
+            .expect("solution rotation should exist");
+        let tile_index = rules
+            .variant_index(tile, rotation)
+            .expect("solution tile variant should exist");
         for &direction in grid.directions() {
             if let Some(neighbor) = grid.neighbor(cell, direction) {
                 let neighbor_position = grid.position_of(neighbor);
@@ -122,9 +155,13 @@ fn verify_solution(request: &WfcRequest, solution: &WfcSolution) {
                     .grid
                     .tile_at(neighbor_position)
                     .expect("neighbor should exist");
+                let neighbor_rotation = solution
+                    .grid
+                    .rotation_at(neighbor_position)
+                    .expect("neighbor rotation should exist");
                 let neighbor_index = rules
-                    .tile_index(neighbor_tile)
-                    .expect("neighbor tile should exist");
+                    .variant_index(neighbor_tile, neighbor_rotation)
+                    .expect("neighbor tile variant should exist");
                 assert!(
                     rules
                         .allowed_mask(direction, tile_index)
@@ -223,6 +260,60 @@ fn different_seeds_produce_multiple_valid_outputs() {
     assert!(
         signatures.len() >= 2,
         "different seeds should explore at least two valid outputs"
+    );
+}
+
+#[test]
+fn compiler_rotates_tile_families_and_preserves_unique_weights() {
+    let meadow = WfcTileId(0);
+    let straight = WfcTileId(1);
+    let ruleset = autorotation_rules_2d();
+    let compiled = super::solver::rules::CompiledRuleset::compile(&ruleset)
+        .expect("autorotation rules should compile");
+
+    assert_eq!(compiled.tile_count(), 7);
+
+    let straight_vertical = compiled
+        .variant_index(straight, 0)
+        .expect("vertical straight should exist");
+    let straight_horizontal = compiled
+        .variant_index(straight, 1)
+        .expect("horizontal straight should exist");
+    let meadow_variant = compiled
+        .variant_index(meadow, 0)
+        .expect("meadow should exist");
+
+    assert_eq!(compiled.tile_rotation(straight_vertical), 0);
+    assert_eq!(compiled.tile_rotation(straight_horizontal), 1);
+    assert!((compiled.weight(straight_vertical) - 0.5).abs() <= f32::EPSILON);
+
+    assert!(
+        compiled
+            .allowed_mask(WfcDirection::XPos, straight_vertical)
+            .contains(meadow_variant)
+    );
+    assert!(
+        !compiled
+            .allowed_mask(WfcDirection::XPos, straight_vertical)
+            .contains(straight_horizontal)
+    );
+    assert!(
+        compiled
+            .allowed_mask(WfcDirection::XPos, straight_horizontal)
+            .contains(straight_horizontal)
+    );
+    assert!(
+        !compiled
+            .allowed_mask(WfcDirection::XPos, straight_horizontal)
+            .contains(straight_vertical)
+    );
+    let corner_horizontal = compiled
+        .variant_index(WfcTileId(2), 1)
+        .expect("rotated corner should exist");
+    assert!(
+        compiled
+            .allowed_mask(WfcDirection::XPos, straight_horizontal)
+            .contains(corner_horizontal)
     );
 }
 

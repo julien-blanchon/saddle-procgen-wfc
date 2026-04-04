@@ -51,6 +51,7 @@ impl DomainBits {
         None
     }
 
+    #[cfg(test)]
     pub fn contains(&self, index: usize) -> bool {
         let word_index = index / 64;
         let bit_index = index % 64;
@@ -89,6 +90,13 @@ impl DomainBits {
             *left &= !*right;
         }
         next
+    }
+
+    pub fn intersects(&self, other: &Self) -> bool {
+        self.words
+            .iter()
+            .zip(&other.words)
+            .any(|(left, right)| (*left & *right) != 0)
     }
 
     pub fn to_indices(&self) -> Vec<usize> {

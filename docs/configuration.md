@@ -56,7 +56,7 @@ Tradeoffs:
 | Field | Type | Effect |
 | --- | --- | --- |
 | `topology` | `WfcTopology` | Selects 2D or 3D active directions |
-| `tiles` | `Vec<WfcTileDefinition>` | Declares all valid tile ids and weights |
+| `tiles` | `Vec<WfcTileDefinition>` | Declares all valid tile ids, family weights, and optional rotation symmetry |
 | `adjacency` | `Vec<WfcAdjacencyRule>` | Explicit allowed-neighbor table |
 
 Ruleset authoring requirements:
@@ -71,10 +71,24 @@ Ruleset authoring requirements:
 | Field | Type | Effect |
 | --- | --- | --- |
 | `id` | `WfcTileId` | Stable generic identifier returned by the solver |
-| `weight` | `f32` | Relative sampling probability during observation |
+| `weight` | `f32` | Relative sampling probability for the whole tile family during observation |
 | `label` | `String` | Human-readable authoring/debug name |
+| `symmetry` | `WfcTileSymmetry` | Optional 2D auto-rotation mode: `Fixed`, `Rotate2`, or `Rotate4` |
 
-Weights are relative, not normalized. A tile with weight `4.0` is sampled roughly four times as often as a tile with weight `1.0` when both are currently allowed.
+Weights are relative, not normalized. A tile with weight `4.0` is sampled roughly four times as often as a tile with weight `1.0` when both are currently allowed. When auto-rotation is enabled, that family weight is divided across the generated rotated variants so the overall family frequency stays stable.
+
+Helpers:
+
+- `WfcTileDefinition::new(id, weight, label)`
+- `WfcTileDefinition::with_symmetry(WfcTileSymmetry::Rotate2 | WfcTileSymmetry::Rotate4)`
+
+## `WfcTileSymmetry`
+
+Use symmetry only for `Cartesian2d` rulesets.
+
+- `Fixed`: one authored orientation, no automatic rotation
+- `Rotate2`: two unique quarter-turn states, useful for straight corridors or roads
+- `Rotate4`: four unique quarter-turn states, useful for elbows, tees, or directional props
 
 ## `WfcAdjacencyRule`
 
@@ -85,6 +99,8 @@ Weights are relative, not normalized. A tile with weight `4.0` is sampled roughl
 | `allowed_tiles` | `Vec<WfcTileId>` | Tiles permitted in that direction |
 
 These rules are explicit. Missing tile-direction pairs are treated as authoring errors.
+
+When a tile uses `WfcTileSymmetry`, author the adjacency rules only for its canonical orientation. The solver rotates those rules automatically for the other generated variants.
 
 ## Local Constraints
 
@@ -101,6 +117,7 @@ Removes a set of tiles from one cell before propagation.
 Restricts every cell on one border plane to the listed tiles.
 
 This is the main v1 tool for chunk seams and fixed-boundary solves.
+For auto-rotated tiles, border constraints apply to the full tile family, not just one specific quarter-turn.
 
 ## Global Constraints
 
@@ -151,6 +168,24 @@ Aggregate runtime counters:
 - cancelled jobs
 - last successful signature
 - last failure reason
+
+## Output Rotation Metadata
+
+### `WfcTileGrid`
+
+`WfcTileGrid::tile_at(position)` still returns the logical `WfcTileId`.
+
+New helpers:
+
+- `WfcTileGrid::rotation_at(position)` returns the chosen quarter-turn index for that cell
+- `WfcTileGrid::variant_at(position)` returns a `WfcTileVariant { tile, rotation_steps }`
+
+### `WfcDebugSnapshot`
+
+Each `WfcCellDebug` now exposes both:
+
+- `possible_tiles`: deduplicated logical tile ids
+- `possible_variants`: logical tile id plus rotation for each remaining candidate
 
 ## Scaling Notes
 

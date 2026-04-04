@@ -16,9 +16,9 @@ pub fn solve_wfc(request: &WfcRequest) -> Result<WfcSolution, WfcFailure> {
     Solver::new(request)?.solve()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct CompiledTileCountConstraint {
-    tile_index: usize,
+    tile_mask: DomainBits,
     min_count: Option<u32>,
     max_count: Option<u32>,
 }
@@ -149,14 +149,11 @@ impl<'a> Solver<'a> {
                     fixed.position
                 )));
             };
-            let Some(tile_index) = self.rules.tile_index(fixed.tile) else {
-                return Err(self.invalid_contradiction(format!(
-                    "fixed cell references unknown tile {:?}",
-                    fixed.tile
-                )));
-            };
-            let singleton = DomainBits::singleton(self.rules.tile_count(), tile_index);
-            self.intersect_domain(cell, &singleton, "fixed cell assignment")?;
+            let allowed_tiles = self
+                .rules
+                .mask_for_tiles(&[fixed.tile])
+                .map_err(|message| self.invalid_contradiction(message))?;
+            self.intersect_domain(cell, &allowed_tiles, "fixed cell assignment")?;
         }
 
         for bans in &self.request.banned_cells {
@@ -378,12 +375,12 @@ impl<'a> Solver<'a> {
             let guaranteed = self
                 .domains
                 .iter()
-                .filter(|domain| domain.is_singleton() && domain.contains(constraint.tile_index))
+                .filter(|domain| domain.is_singleton() && domain.intersects(&constraint.tile_mask))
                 .count() as u32;
             let possible = self
                 .domains
                 .iter()
-                .filter(|domain| domain.contains(constraint.tile_index))
+                .filter(|domain| domain.intersects(&constraint.tile_mask))
                 .count() as u32;
 
             if constraint.max_count.is_some_and(|max| guaranteed > max) {
@@ -422,10 +419,16 @@ impl<'a> Solver<'a> {
             .into_iter()
             .map(|index| self.rules.tile_id(index))
             .collect();
+        let remaining_variants = self.domains[cell]
+            .to_indices()
+            .into_iter()
+            .map(|index| self.rules.tile_variant(index))
+            .collect();
         self.last_contradiction = Some(WfcContradiction {
             position: self.grid.position_of(cell),
             last_observed_cell: self.last_observed.map(|index| self.grid.position_of(index)),
             remaining_candidates,
+            remaining_variants,
             decision_depth: self.decisions.len() as u32,
             note: note.to_string(),
         });
@@ -446,10 +449,19 @@ impl<'a> Solver<'a> {
                     .tile_id(domain.first_one().expect("solved domains are set"))
             })
             .collect::<Vec<_>>();
+        let rotations = self
+            .domains
+            .iter()
+            .map(|domain| {
+                self.rules
+                    .tile_rotation(domain.first_one().expect("solved domains are set"))
+            })
+            .collect::<Vec<_>>();
         let grid = WfcTileGrid {
             topology: self.grid.topology(),
             size: self.grid.size(),
             tiles,
+            rotations,
         };
         let signature = grid.signature();
         let debug = self
@@ -524,12 +536,6 @@ fn compile_global_constraints(
                 min_count,
                 max_count,
             }) => {
-                let Some(tile_index) = rules.tile_index(*tile) else {
-                    return Err(invalid_failure(
-                        request,
-                        format!("global constraint references unknown tile {:?}", tile),
-                    ));
-                };
                 if let (Some(min), Some(max)) = (min_count, max_count)
                     && min > max
                 {
@@ -538,8 +544,11 @@ fn compile_global_constraints(
                         format!("tile-count constraint for {:?} has min > max", tile),
                     ));
                 }
+                let tile_mask = rules
+                    .mask_for_tiles(&[*tile])
+                    .map_err(|message| invalid_failure(request, message))?;
                 compiled.push(CompiledTileCountConstraint {
-                    tile_index,
+                    tile_mask,
                     min_count: *min_count,
                     max_count: *max_count,
                 });
@@ -568,18 +577,28 @@ impl<'a> Solver<'a> {
             .iter()
             .enumerate()
             .map(|(cell, domain)| {
+                let possible_variants = domain
+                    .to_indices()
+                    .into_iter()
+                    .map(|index| self.rules.tile_variant(index))
+                    .collect::<Vec<_>>();
                 let possible_tiles = domain
                     .to_indices()
                     .into_iter()
                     .map(|index| self.rules.tile_id(index))
                     .collect::<Vec<_>>();
-                let collapsed_tile = domain.first_one().map(|index| self.rules.tile_id(index));
+                let collapsed_variant = domain
+                    .first_one()
+                    .map(|index| self.rules.tile_variant(index));
+                let collapsed_tile = collapsed_variant.map(|variant| variant.tile);
                 WfcCellDebug {
                     position: self.grid.position_of(cell),
-                    possible_tiles,
+                    possible_tiles: dedupe_tile_ids(possible_tiles),
+                    possible_variants,
                     possible_count: self.possible_counts[cell] as u32,
                     entropy: self.entropy(cell),
                     collapsed_tile,
+                    collapsed_variant,
                 }
             })
             .collect();
@@ -590,4 +609,14 @@ impl<'a> Solver<'a> {
             contradiction: self.last_contradiction.clone(),
         }
     }
+}
+
+fn dedupe_tile_ids(tile_ids: Vec<crate::WfcTileId>) -> Vec<crate::WfcTileId> {
+    let mut deduped = Vec::new();
+    for tile_id in tile_ids {
+        if !deduped.contains(&tile_id) {
+            deduped.push(tile_id);
+        }
+    }
+    deduped
 }

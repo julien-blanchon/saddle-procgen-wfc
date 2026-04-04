@@ -11,11 +11,12 @@ pub use components::{WfcJob, WfcJobId, WfcJobResult, WfcJobStatus, WfcRuntimeDia
 pub use config::{
     WfcAdjacencyRule, WfcBorder, WfcBorderConstraint, WfcCellBans, WfcDirection, WfcFixedCell,
     WfcGlobalConstraint, WfcGridSize, WfcObservationHeuristic, WfcRequest, WfcRuleset, WfcSeed,
-    WfcSettings, WfcTileCountConstraint, WfcTileDefinition, WfcTileId, WfcTopology,
+    WfcSettings, WfcTileCountConstraint, WfcTileDefinition, WfcTileId, WfcTileSymmetry,
+    WfcTopology,
 };
 pub use debug::{
     WfcCellDebug, WfcContradiction, WfcDebugSnapshot, WfcFailure, WfcFailureReason, WfcSolution,
-    WfcSolveStats, WfcTileGrid,
+    WfcSolveStats, WfcTileGrid, WfcTileVariant,
 };
 pub use messages::{GenerateWfc, WfcFailed, WfcProgress, WfcSolved};
 pub use solver::solve_wfc;
@@ -115,6 +116,8 @@ impl Plugin for WfcPlugin {
             .register_type::<WfcTileDefinition>()
             .register_type::<WfcTileGrid>()
             .register_type::<WfcTileId>()
+            .register_type::<WfcTileSymmetry>()
+            .register_type::<WfcTileVariant>()
             .register_type::<WfcTopology>()
             .add_systems(self.activate_schedule, systems::activate_runtime)
             .add_systems(self.deactivate_schedule, systems::deactivate_runtime)

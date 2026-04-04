@@ -130,6 +130,7 @@ pub struct WfcTileDefinition {
     pub id: WfcTileId,
     pub weight: f32,
     pub label: String,
+    pub symmetry: WfcTileSymmetry,
 }
 
 impl WfcTileDefinition {
@@ -138,6 +139,33 @@ impl WfcTileDefinition {
             id: id.into(),
             weight,
             label: label.into(),
+            symmetry: WfcTileSymmetry::default(),
+        }
+    }
+
+    pub fn with_symmetry(mut self, symmetry: WfcTileSymmetry) -> Self {
+        self.symmetry = symmetry;
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+pub enum WfcTileSymmetry {
+    #[default]
+    Fixed,
+    Rotate2,
+    Rotate4,
+}
+
+impl WfcTileSymmetry {
+    pub const fn unique_rotations(self, topology: WfcTopology) -> u8 {
+        match topology {
+            WfcTopology::Cartesian2d => match self {
+                Self::Fixed => 1,
+                Self::Rotate2 => 2,
+                Self::Rotate4 => 4,
+            },
+            WfcTopology::Cartesian3d => 1,
         }
     }
 }

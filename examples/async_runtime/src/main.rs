@@ -1,11 +1,51 @@
+use bevy::prelude::*;
+use saddle_pane::prelude::*;
+use saddle_procgen_wfc::{GenerateWfc, WfcPlugin, WfcSolved, WfcSystems};
 use saddle_procgen_wfc_example_support as common;
 
-use bevy::prelude::*;
-use common::{basic_request, color_for_tile_2d, install_auto_exit, spatial_root};
-use saddle_procgen_wfc::{GenerateWfc, WfcPlugin, WfcSolved, WfcSystems};
+#[derive(Resource, Clone, PartialEq)]
+struct AsyncConfig {
+    seed: u64,
+    width: u32,
+    height: u32,
+}
+
+impl Default for AsyncConfig {
+    fn default() -> Self {
+        Self {
+            seed: 77,
+            width: 18,
+            height: 12,
+        }
+    }
+}
+
+#[derive(Resource, Pane)]
+#[pane(title = "Async Runtime", position = "top-right")]
+struct AsyncPane {
+    #[pane(number, min = 0.0, step = 1.0)]
+    seed: u32,
+    #[pane(slider, min = 10.0, max = 28.0, step = 1.0)]
+    width: u32,
+    #[pane(slider, min = 8.0, max = 20.0, step = 1.0)]
+    height: u32,
+}
+
+impl Default for AsyncPane {
+    fn default() -> Self {
+        Self {
+            seed: 77,
+            width: 18,
+            height: 12,
+        }
+    }
+}
 
 #[derive(Resource, Default)]
 struct SolveText(String);
+
+#[derive(Resource, Default)]
+struct LastRequested(Option<AsyncConfig>);
 
 #[derive(Component)]
 struct AsyncGridRoot;
@@ -16,7 +56,10 @@ struct AsyncOverlay;
 fn main() {
     let mut app = App::new();
     app.insert_resource(ClearColor(Color::srgb(0.055, 0.06, 0.08)));
+    app.init_resource::<AsyncConfig>();
+    app.init_resource::<AsyncPane>();
     app.init_resource::<SolveText>();
+    app.init_resource::<LastRequested>();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "wfc async_runtime".into(),
@@ -25,12 +68,15 @@ fn main() {
         }),
         ..default()
     }));
+    app.add_plugins(PanePlugin);
+    app.register_pane::<AsyncPane>();
     app.add_plugins(WfcPlugin::default());
-    install_auto_exit(&mut app);
+    common::install_auto_exit(&mut app);
     app.add_systems(Startup, setup);
     app.add_systems(
         Update,
         (
+            sync_pane_to_config,
             request_generation.before(WfcSystems::Request),
             apply_solution.after(WfcSystems::ApplyResults),
             update_overlay.after(WfcSystems::ApplyResults),
@@ -49,19 +95,48 @@ fn setup(mut commands: Commands) {
             position_type: PositionType::Absolute,
             top: px(14),
             left: px(14),
+            width: px(360),
+            padding: UiRect::all(px(12)),
             ..default()
         },
+        BackgroundColor(Color::srgba(0.06, 0.08, 0.10, 0.82)),
     ));
 }
 
-fn request_generation(mut writer: Local<bool>, mut requests: MessageWriter<GenerateWfc>) {
-    if *writer {
+fn sync_pane_to_config(pane: Res<AsyncPane>, mut config: ResMut<AsyncConfig>) {
+    let next = AsyncConfig {
+        seed: pane.seed as u64,
+        width: pane.width.max(8),
+        height: pane.height.max(6),
+    };
+    if *config != next {
+        *config = next;
+    }
+}
+
+fn request_generation(
+    config: Res<AsyncConfig>,
+    mut last_requested: ResMut<LastRequested>,
+    mut summary: ResMut<SolveText>,
+    mut requests: MessageWriter<GenerateWfc>,
+) {
+    if last_requested.0.as_ref() == Some(&*config) {
         return;
     }
-    *writer = true;
+
+    let mut request = common::basic_request(config.seed);
+    request.grid_size = saddle_procgen_wfc::WfcGridSize::new_2d(config.width, config.height);
+    summary.0 = format!(
+        "async_runtime\nqueued seed {} at {}x{}",
+        config.seed, config.width, config.height
+    );
+    last_requested.0 = Some(config.clone());
     requests.write(GenerateWfc {
-        request: basic_request(77),
-        label: Some("async basic".into()),
+        request,
+        label: Some(format!(
+            "async basic {}x{} seed {}",
+            config.width, config.height, config.seed
+        )),
     });
 }
 
@@ -92,7 +167,7 @@ fn apply_solution(
         commands
             .spawn((
                 AsyncGridRoot,
-                spatial_root("Async Grid Root", Transform::default()),
+                common::spatial_root("Async Grid Root", Transform::default()),
             ))
             .with_children(|parent| {
                 for y in 0..solved.solution.grid.size.height {
@@ -104,7 +179,7 @@ fn apply_solution(
                             .expect("tile should exist");
                         parent.spawn((
                             Sprite::from_color(
-                                color_for_tile_2d(tile),
+                                common::color_for_tile_2d(tile),
                                 Vec2::splat(tile_size - 2.0),
                             ),
                             Transform::from_xyz(

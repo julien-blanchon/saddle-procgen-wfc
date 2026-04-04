@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use saddle_procgen_wfc::{
     WfcBorder, WfcBorderConstraint, WfcDirection, WfcFixedCell, WfcGlobalConstraint, WfcGridSize,
     WfcRequest, WfcRuleset, WfcSeed, WfcSettings, WfcTileCountConstraint, WfcTileDefinition,
-    WfcTileId, WfcTopology,
+    WfcTileId, WfcTileSymmetry, WfcTopology,
 };
 use std::borrow::Cow;
 use std::time::Duration;
@@ -147,6 +147,49 @@ pub fn constrained_room_request(seed: u64) -> WfcRequest {
             min_count: Some(1),
             max_count: Some(1),
         }));
+    request
+}
+
+pub fn autorotation_request(seed: u64, width: u32, height: u32) -> WfcRequest {
+    let meadow = WfcTileId(0);
+    let straight = WfcTileId(1);
+    let corner = WfcTileId(2);
+    let water = WfcTileId(3);
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(meadow, 4.0, "Meadow"),
+            WfcTileDefinition::new(straight, 1.2, "Road Straight")
+                .with_symmetry(WfcTileSymmetry::Rotate2),
+            WfcTileDefinition::new(corner, 0.8, "Road Corner")
+                .with_symmetry(WfcTileSymmetry::Rotate4),
+            WfcTileDefinition::new(water, 0.9, "Water"),
+        ],
+    )
+    .with_rule(meadow, WfcDirection::XPos, [meadow, straight, corner, water])
+    .with_rule(meadow, WfcDirection::XNeg, [meadow, straight, corner, water])
+    .with_rule(meadow, WfcDirection::YPos, [meadow, straight, corner, water])
+    .with_rule(meadow, WfcDirection::YNeg, [meadow, straight, corner, water])
+    .with_rule(straight, WfcDirection::XPos, [meadow, water])
+    .with_rule(straight, WfcDirection::XNeg, [meadow, water])
+    .with_rule(straight, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(straight, WfcDirection::YNeg, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::XPos, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::XNeg, [meadow, water])
+    .with_rule(corner, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::YNeg, [meadow, water])
+    .with_rule(water, WfcDirection::XPos, [meadow, water])
+    .with_rule(water, WfcDirection::XNeg, [meadow, water])
+    .with_rule(water, WfcDirection::YPos, [meadow, water])
+    .with_rule(water, WfcDirection::YNeg, [meadow, water]);
+
+    let mut request = WfcRequest::new(WfcGridSize::new_2d(width, height), ruleset, WfcSeed(seed));
+    request.border_constraints = vec![
+        WfcBorderConstraint::new(WfcBorder::MinX, [meadow, water]),
+        WfcBorderConstraint::new(WfcBorder::MaxX, [meadow, water]),
+        WfcBorderConstraint::new(WfcBorder::MinY, [meadow, water]),
+        WfcBorderConstraint::new(WfcBorder::MaxY, [meadow, water]),
+    ];
     request
 }
 

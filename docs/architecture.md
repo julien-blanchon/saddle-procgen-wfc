@@ -17,6 +17,7 @@ This v1 architecture intentionally follows a few concrete lessons from the WFC /
 
 - The public ruleset uses explicit `WfcTileId` values.
 - Compilation maps those ids to dense internal indices.
+- When `WfcTileSymmetry` is enabled in 2D, compilation expands one logical tile family into two or four rotated internal variants.
 - Each direction and tile gets a precomputed compatibility bitset.
 - Each cell stores its current domain as a compact bitset plus a cached domain-size count.
 
@@ -26,6 +27,15 @@ That gives a direct representation of the simple tiled model:
 cell domain = { possible tile ids at this position }
 adjacency[tile][direction] = bitset of compatible neighbor tiles
 ```
+
+For auto-rotated families the internal model becomes:
+
+```text
+logical tile id + quarter-turn -> internal variant index
+adjacency[variant][direction] = rotated compatibility bitset
+```
+
+The public output still reports the logical tile id, plus a separate chosen rotation per collapsed cell.
 
 ## Propagation Strategy
 
@@ -106,6 +116,7 @@ Failures report:
 - optional per-cell debug snapshot
 
 The debug snapshot contains the remaining domain, entropy, and collapsed tile per cell. It is disabled by default because it can be large on big grids.
+When rotated families are in play, the snapshot also carries the surviving rotated variants so authoring mistakes are easier to diagnose.
 
 ## Bevy Runtime Layer
 
@@ -122,7 +133,6 @@ The plugin is deliberately small:
 ## Planned Extension Points
 
 - sample-derived rule import helpers
-- symmetry / rotated-variant helpers
 - partial sub-block repair APIs
 - alternate propagation backends such as support-count AC-4
 - overlapping-model support on top of the same request/result shell
