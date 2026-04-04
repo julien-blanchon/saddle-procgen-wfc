@@ -4,21 +4,23 @@ mod components;
 mod config;
 mod debug;
 mod messages;
+mod overlap;
 mod solver;
 mod systems;
 
 pub use components::{WfcJob, WfcJobId, WfcJobResult, WfcJobStatus, WfcRuntimeDiagnostics};
 pub use config::{
-    WfcAdjacencyRule, WfcBorder, WfcBorderConstraint, WfcCellBans, WfcDirection, WfcFixedCell,
-    WfcGlobalConstraint, WfcGridSize, WfcObservationHeuristic, WfcRequest, WfcRuleset, WfcSeed,
-    WfcSettings, WfcTileCountConstraint, WfcTileDefinition, WfcTileId, WfcTileSymmetry,
-    WfcTopology,
+    WfcAdjacencyRule, WfcBorder, WfcBorderConstraint, WfcBoundaryStitching, WfcCellBans,
+    WfcDirection, WfcFixedCell, WfcGlobalConstraint, WfcGridSize, WfcObservationHeuristic,
+    WfcRequest, WfcRuleset, WfcSeed, WfcSettings, WfcTileCountConstraint, WfcTileDefinition,
+    WfcTileId, WfcTileSymmetry, WfcTopology,
 };
 pub use debug::{
     WfcCellDebug, WfcContradiction, WfcDebugSnapshot, WfcFailure, WfcFailureReason, WfcSolution,
     WfcSolveStats, WfcTileGrid, WfcTileVariant,
 };
 pub use messages::{GenerateWfc, WfcFailed, WfcProgress, WfcSolved};
+pub use overlap::{WfcOverlapOptions, WfcOverlapRequest, solve_overlap_wfc_2d};
 pub use solver::solve_wfc;
 
 use bevy::{
@@ -87,6 +89,7 @@ impl Plugin for WfcPlugin {
             .register_type::<WfcAdjacencyRule>()
             .register_type::<WfcBorder>()
             .register_type::<WfcBorderConstraint>()
+            .register_type::<WfcBoundaryStitching>()
             .register_type::<WfcCellBans>()
             .register_type::<WfcCellDebug>()
             .register_type::<WfcContradiction>()
@@ -102,6 +105,8 @@ impl Plugin for WfcPlugin {
             .register_type::<WfcJobResult>()
             .register_type::<WfcJobStatus>()
             .register_type::<WfcObservationHeuristic>()
+            .register_type::<WfcOverlapOptions>()
+            .register_type::<WfcOverlapRequest>()
             .register_type::<WfcProgress>()
             .register_type::<WfcRequest>()
             .register_type::<WfcRuleset>()
@@ -165,3 +170,7 @@ mod solver_tests;
 #[cfg(test)]
 #[path = "systems_tests.rs"]
 mod systems_tests;
+
+#[cfg(test)]
+#[path = "overlap_tests.rs"]
+mod overlap_tests;

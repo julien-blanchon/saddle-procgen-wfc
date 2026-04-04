@@ -107,6 +107,7 @@ pub fn scenario_by_name(name: &str) -> Option<Scenario> {
     match name {
         "wfc_smoke" => Some(wfc_smoke()),
         "wfc_views" => Some(wfc_views()),
+        "wfc_topologies" => Some(wfc_topologies()),
         "wfc_regeneration" => Some(wfc_regeneration()),
         "wfc_async_large" => Some(wfc_async_large()),
         _ => None,
@@ -117,6 +118,7 @@ pub fn list_scenarios() -> Vec<&'static str> {
     vec![
         "wfc_smoke",
         "wfc_views",
+        "wfc_topologies",
         "wfc_regeneration",
         "wfc_async_large",
     ]
@@ -193,6 +195,37 @@ fn wfc_regeneration() -> Scenario {
         .build()
 }
 
+fn wfc_topologies() -> Scenario {
+    Scenario::builder("wfc_topologies")
+        .description(
+            "Switch to the stitched torus and hex views, then verify both solve and publish diagnostics for the new topology modes.",
+        )
+        .then(remember_signature())
+        .then(switch_view(LabView::Stitched))
+        .then(wait_for_new_signature(LabView::Stitched))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "stitched view validates wrapped seams",
+            |diagnostics| diagnostics.seam_pairs >= 10 && diagnostics.visible_cells == 24,
+        ))
+        .then(Action::Screenshot("wfc_stitched".into()))
+        .then(Action::WaitFrames(1))
+        .then(remember_signature())
+        .then(switch_view(LabView::Hex))
+        .then(wait_for_new_signature(LabView::Hex))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "hex view solves with visible output",
+            |diagnostics| {
+                diagnostics.active_view == LabView::Hex
+                    && diagnostics.solve_state == LabSolveState::Solved
+                    && diagnostics.visible_cells == 80
+            },
+        ))
+        .then(Action::Screenshot("wfc_hex".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("wfc_topologies"))
+        .build()
+}
+
 fn wfc_async_large() -> Scenario {
     Scenario::builder("wfc_async_large")
         .description(
@@ -218,7 +251,7 @@ fn wfc_async_large() -> Scenario {
                 diagnostics.active_view == LabView::Large
                     && diagnostics.signature != 0
                     && diagnostics.visible_cells == 64 * 48
-                    && diagnostics.running_jobs == 0
+                    && diagnostics.completed_jobs >= 1
             },
         ))
         .then(inspect::log_resource::<LabDiagnostics>("large solved diagnostics"))

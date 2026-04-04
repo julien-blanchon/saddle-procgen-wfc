@@ -1,12 +1,12 @@
 [workspace]
 members = [
-    "support",
     "auto_rotation",
     "basic_2d",
     "constrained_room",
     "voxel_3d",
     "async_runtime",
     "debug_entropy",
+    "tilemap_overlap",
     "lab",
 ]
 resolver = "3"
@@ -15,6 +15,9 @@ resolver = "3"
 bevy = { version = "0.18", features = ["serialize"] }
 saddle-procgen-wfc = { path = ".." }
 saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
+bevy_flair = "0.7"
+bevy_input_focus = "0.18"
+bevy_ui_widgets = "0.18"
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

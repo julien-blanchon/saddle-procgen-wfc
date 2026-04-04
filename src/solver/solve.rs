@@ -64,8 +64,12 @@ struct Solver<'a> {
 impl<'a> Solver<'a> {
     #[allow(clippy::result_large_err)]
     fn new(request: &'a WfcRequest) -> Result<Self, WfcFailure> {
-        let grid = CompiledGrid::new(request.ruleset.topology, request.grid_size)
-            .map_err(|message| invalid_failure(request, message))?;
+        let grid = CompiledGrid::new(
+            request.ruleset.topology,
+            request.grid_size,
+            request.boundary_stitching,
+        )
+        .map_err(|message| invalid_failure(request, message))?;
         let rules = CompiledRuleset::compile(&request.ruleset)
             .map_err(|message| invalid_failure(request, message))?;
 

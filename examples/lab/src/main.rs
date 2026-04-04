@@ -1,17 +1,19 @@
 #[cfg(feature = "e2e")]
 mod e2e;
 
-use saddle_procgen_wfc_example_support as common;
+#[path = "../../shared/support.rs"]
+mod common;
 
 use bevy::prelude::*;
 #[cfg(feature = "dev")]
 use bevy::remote::{RemotePlugin, http::RemoteHttpPlugin};
 #[cfg(feature = "dev")]
 use bevy_brp_extras::BrpExtrasPlugin;
+use saddle_pane::prelude::*;
 
 use common::{
     basic_request, color_for_tile_2d, constrained_room_request, contradiction_request,
-    large_request, spatial_root,
+    hex_request, large_request, spatial_root, stitched_request,
 };
 use saddle_procgen_wfc::{
     GenerateWfc, WfcFailure, WfcFailureReason, WfcPlugin, WfcRuntimeDiagnostics, WfcSolved,
@@ -27,6 +29,8 @@ pub enum LabView {
     Room,
     Contradiction,
     Large,
+    Stitched,
+    Hex,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Reflect)]
@@ -44,6 +48,7 @@ struct LabControl {
     active_view: LabView,
     pending_view: Option<LabView>,
     seed: u64,
+    pane_sync_cooldown: u8,
     expected_label: Option<String>,
     regenerate_requested: bool,
     started_once: bool,
@@ -55,9 +60,28 @@ impl Default for LabControl {
             active_view: LabView::Basic,
             pending_view: Some(LabView::Basic),
             seed: seed_for_view(LabView::Basic),
+            pane_sync_cooldown: 0,
             expected_label: None,
             regenerate_requested: false,
             started_once: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Resource, Pane)]
+#[pane(title = "WFC Lab", position = "top-right")]
+struct LabPane {
+    #[pane(slider, min = 0.0, max = 5.0, step = 1.0)]
+    view_index: u32,
+    #[pane(number, min = 0.0, step = 1.0)]
+    seed: u32,
+}
+
+impl Default for LabPane {
+    fn default() -> Self {
+        Self {
+            view_index: 0,
+            seed: seed_for_view(LabView::Basic) as u32,
         }
     }
 }
@@ -80,6 +104,7 @@ pub struct LabDiagnostics {
     pub running_jobs: u64,
     pub recent_signatures: Vec<u64>,
     pub last_failure_reason: Option<WfcFailureReason>,
+    pub seam_pairs: usize,
 }
 
 impl Default for LabDiagnostics {
@@ -100,6 +125,7 @@ impl Default for LabDiagnostics {
             running_jobs: 0,
             recent_signatures: Vec::new(),
             last_failure_reason: None,
+            seam_pairs: 0,
         }
     }
 }
@@ -118,6 +144,7 @@ fn main() {
     let mut app = App::new();
     app.insert_resource(ClearColor(Color::srgb(0.05, 0.055, 0.07)));
     app.init_resource::<LabControl>();
+    app.init_resource::<LabPane>();
     app.init_resource::<LabDiagnostics>();
     app.init_resource::<BeforeSignature>();
     app.register_type::<LabView>();
@@ -134,6 +161,14 @@ fn main() {
         ..default()
     }));
     app.add_plugins(WfcPlugin::default());
+    app.add_plugins((
+        bevy_flair::FlairPlugin,
+        bevy_input_focus::InputDispatchPlugin,
+        bevy_ui_widgets::UiWidgetsPlugins,
+        bevy_input_focus::tab_navigation::TabNavigationPlugin,
+        PanePlugin,
+    ));
+    app.register_pane::<LabPane>();
     #[cfg(feature = "dev")]
     app.add_plugins((
         RemotePlugin::default(),
@@ -145,6 +180,8 @@ fn main() {
     app.add_systems(
         Update,
         (
+            sync_pane_to_control,
+            sync_control_to_pane,
             handle_keyboard_input,
             apply_lab_requests.before(WfcSystems::Request),
             apply_solution.after(WfcSystems::ApplyResults),
@@ -189,7 +226,16 @@ fn setup(mut commands: Commands) {
 
 #[cfg(feature = "e2e")]
 pub(crate) fn set_view(world: &mut World, view: LabView) {
-    world.resource_mut::<LabControl>().pending_view = Some(view);
+    let seed = seed_for_view(view);
+    {
+        let mut control = world.resource_mut::<LabControl>();
+        control.pending_view = Some(view);
+        control.seed = seed;
+        control.pane_sync_cooldown = 4;
+    }
+    let mut pane = world.resource_mut::<LabPane>();
+    pane.view_index = index_for_view(view);
+    pane.seed = seed as u32;
 }
 
 #[cfg(feature = "e2e")]
@@ -198,18 +244,75 @@ pub(crate) fn request_regeneration(world: &mut World) {
 }
 
 fn handle_keyboard_input(keys: Res<ButtonInput<KeyCode>>, mut control: ResMut<LabControl>) {
+    let mut changed_view = false;
     if keys.just_pressed(KeyCode::Digit1) {
         control.pending_view = Some(LabView::Basic);
+        control.seed = seed_for_view(LabView::Basic);
+        changed_view = true;
     } else if keys.just_pressed(KeyCode::Digit2) {
         control.pending_view = Some(LabView::Room);
+        control.seed = seed_for_view(LabView::Room);
+        changed_view = true;
     } else if keys.just_pressed(KeyCode::Digit3) {
         control.pending_view = Some(LabView::Contradiction);
+        control.seed = seed_for_view(LabView::Contradiction);
+        changed_view = true;
     } else if keys.just_pressed(KeyCode::Digit4) {
         control.pending_view = Some(LabView::Large);
+        control.seed = seed_for_view(LabView::Large);
+        changed_view = true;
+    } else if keys.just_pressed(KeyCode::Digit5) {
+        control.pending_view = Some(LabView::Stitched);
+        control.seed = seed_for_view(LabView::Stitched);
+        changed_view = true;
+    } else if keys.just_pressed(KeyCode::Digit6) {
+        control.pending_view = Some(LabView::Hex);
+        control.seed = seed_for_view(LabView::Hex);
+        changed_view = true;
+    }
+
+    if changed_view {
+        control.pane_sync_cooldown = 4;
     }
 
     if keys.just_pressed(KeyCode::Space) {
         control.regenerate_requested = true;
+    }
+}
+
+fn sync_pane_to_control(pane: Res<LabPane>, mut control: ResMut<LabControl>) {
+    if control.pane_sync_cooldown > 0 {
+        control.pane_sync_cooldown -= 1;
+        return;
+    }
+
+    if !pane.is_changed() {
+        return;
+    }
+
+    let next_view = view_from_index(pane.view_index);
+    let next_seed = pane.seed as u64;
+    if control.active_view != next_view || control.pending_view != Some(next_view) {
+        control.pending_view = Some(next_view);
+    }
+    if control.seed != next_seed {
+        control.seed = next_seed;
+        control.regenerate_requested = true;
+    }
+}
+
+fn sync_control_to_pane(control: Res<LabControl>, mut pane: ResMut<LabPane>) {
+    if !control.is_changed() {
+        return;
+    }
+
+    let next_view = index_for_view(control.pending_view.unwrap_or(control.active_view));
+    let next_seed = control.seed as u32;
+    if pane.view_index != next_view {
+        pane.view_index = next_view;
+    }
+    if pane.seed != next_seed {
+        pane.seed = next_seed;
     }
 }
 
@@ -220,7 +323,6 @@ fn apply_lab_requests(
 ) {
     if let Some(view) = control.pending_view.take() {
         control.active_view = view;
-        control.seed = seed_for_view(view);
         control.regenerate_requested = false;
         control.started_once = true;
         diagnostics.active_view = view;
@@ -266,7 +368,7 @@ fn apply_solution(
         }
 
         for entity in &roots {
-            commands.entity(entity).despawn();
+            commands.entity(entity).try_despawn();
         }
 
         diagnostics.solve_state = LabSolveState::Solved;
@@ -288,11 +390,20 @@ fn apply_solution(
                 .iter()
                 .filter(|tile| matches!(tile.0, 2 | 3))
                 .count(),
+            LabView::Stitched => count_seam_pairs(&solved.solution),
+            LabView::Hex => solved
+                .solution
+                .grid
+                .tiles
+                .iter()
+                .filter(|tile| tile.0 == 2)
+                .count(),
             LabView::Contradiction => 0,
         };
         diagnostics.ambiguous_cells = 0;
         diagnostics.contradiction_position = None;
         diagnostics.last_failure_reason = None;
+        diagnostics.seam_pairs = count_seam_pairs(&solved.solution);
         diagnostics.regeneration_count = diagnostics.regeneration_count.saturating_add(1);
         diagnostics
             .recent_signatures
@@ -360,7 +471,7 @@ fn apply_failure(
         }
 
         for entity in &roots {
-            commands.entity(entity).despawn();
+            commands.entity(entity).try_despawn();
         }
         render_failure(&mut commands, &failed.failure, &mut diagnostics);
     }
@@ -377,6 +488,7 @@ fn render_failure(commands: &mut Commands, failure: &WfcFailure, diagnostics: &m
         diagnostics.zero_domain_cells = 0;
         diagnostics.highlighted_cells = 0;
         diagnostics.ambiguous_cells = 0;
+        diagnostics.seam_pairs = 0;
         return;
     };
 
@@ -392,6 +504,7 @@ fn render_failure(commands: &mut Commands, failure: &WfcFailure, diagnostics: &m
         .iter()
         .filter(|cell| cell.possible_count > 1)
         .count();
+    diagnostics.seam_pairs = 0;
 
     commands
         .spawn((
@@ -456,7 +569,7 @@ fn update_overlay(
 ) {
     if diagnostics.is_changed() {
         **overlay = Text::new(format!(
-            "wfc_lab\nview: {:?}\nstate: {:?}\nseed: {}\nsignature: {}\nvisible cells: {}\nzero-domain cells: {}\n{}\nruntime jobs: running={} completed={} failed={}\nrecent signatures: {}\ncontradiction: {}\ncontrols: 1 basic 2 room 3 contradiction 4 large space regenerate",
+            "wfc_lab\nview: {:?}\nstate: {:?}\nseed: {}\nsignature: {}\nvisible cells: {}\nzero-domain cells: {}\n{}\nruntime jobs: running={} completed={} failed={}\nrecent signatures: {}\ncontradiction: {}\ncontrols: 1 basic 2 room 3 contradiction 4 large 5 stitched 6 hex space regenerate",
             diagnostics.active_view,
             diagnostics.solve_state,
             diagnostics.seed,
@@ -479,6 +592,8 @@ fn seed_for_view(view: LabView) -> u64 {
         LabView::Room => 19,
         LabView::Contradiction => 41,
         LabView::Large => 87,
+        LabView::Stitched => 21,
+        LabView::Hex => 64,
     }
 }
 
@@ -488,6 +603,8 @@ fn request_for_view(view: LabView, seed: u64) -> saddle_procgen_wfc::WfcRequest 
         LabView::Room => constrained_room_request(seed),
         LabView::Contradiction => contradiction_request(seed),
         LabView::Large => large_request(seed),
+        LabView::Stitched => stitched_request(seed),
+        LabView::Hex => hex_request(seed),
     }
 }
 
@@ -520,8 +637,54 @@ fn view_metric_line(diagnostics: &LabDiagnostics) -> String {
             format!("water cells: {}", diagnostics.highlighted_cells)
         }
         LabView::Room => format!("portal cells: {}", diagnostics.highlighted_cells),
+        LabView::Stitched => format!("wrapped seam pairs: {}", diagnostics.seam_pairs),
+        LabView::Hex => format!("water cells: {}", diagnostics.highlighted_cells),
         LabView::Contradiction => format!("ambiguous cells: {}", diagnostics.ambiguous_cells),
     }
+}
+
+fn view_from_index(index: u32) -> LabView {
+    match index {
+        0 => LabView::Basic,
+        1 => LabView::Room,
+        2 => LabView::Contradiction,
+        3 => LabView::Large,
+        4 => LabView::Stitched,
+        _ => LabView::Hex,
+    }
+}
+
+fn index_for_view(view: LabView) -> u32 {
+    match view {
+        LabView::Basic => 0,
+        LabView::Room => 1,
+        LabView::Contradiction => 2,
+        LabView::Large => 3,
+        LabView::Stitched => 4,
+        LabView::Hex => 5,
+    }
+}
+
+fn count_seam_pairs(solution: &saddle_procgen_wfc::WfcSolution) -> usize {
+    let width = solution.grid.size.width;
+    let height = solution.grid.size.height;
+    if width == 0 || height == 0 {
+        return 0;
+    }
+
+    let horizontal = (0..height)
+        .filter(|&y| {
+            solution.grid.tile_at(UVec3::new(0, y, 0))
+                != solution.grid.tile_at(UVec3::new(width - 1, y, 0))
+        })
+        .count();
+    let vertical = (0..width)
+        .filter(|&x| {
+            solution.grid.tile_at(UVec3::new(x, 0, 0))
+                != solution.grid.tile_at(UVec3::new(x, height - 1, 0))
+        })
+        .count();
+    horizontal + vertical
 }
 
 fn format_recent_signatures(signatures: &[u64]) -> String {

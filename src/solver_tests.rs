@@ -130,8 +130,12 @@ fn forced_backtrack_rules() -> WfcRequest {
 }
 
 fn verify_solution(request: &WfcRequest, solution: &WfcSolution) {
-    let grid = super::solver::grid::CompiledGrid::new(request.ruleset.topology, request.grid_size)
-        .expect("request grid should compile");
+    let grid = super::solver::grid::CompiledGrid::new(
+        request.ruleset.topology,
+        request.grid_size,
+        request.boundary_stitching,
+    )
+    .expect("request grid should compile");
     let rules = super::solver::rules::CompiledRuleset::compile(&request.ruleset)
         .expect("rules should compile");
 
@@ -422,9 +426,12 @@ fn three_dimensional_rules_solve_and_validate() {
 
 #[test]
 fn grid_indexing_matches_expected_neighbors_in_two_and_three_dimensions() {
-    let grid_2d =
-        super::solver::grid::CompiledGrid::new(WfcTopology::Cartesian2d, WfcGridSize::new_2d(3, 2))
-            .expect("2D grid should compile");
+    let grid_2d = super::solver::grid::CompiledGrid::new(
+        WfcTopology::Cartesian2d,
+        WfcGridSize::new_2d(3, 2),
+        WfcBoundaryStitching::default(),
+    )
+    .expect("2D grid should compile");
     let center = grid_2d
         .index_of(UVec3::new(1, 1, 0))
         .expect("center should exist");
@@ -435,6 +442,7 @@ fn grid_indexing_matches_expected_neighbors_in_two_and_three_dimensions() {
     let grid_3d = super::solver::grid::CompiledGrid::new(
         WfcTopology::Cartesian3d,
         WfcGridSize::new_3d(2, 2, 2),
+        WfcBoundaryStitching::default(),
     )
     .expect("3D grid should compile");
     let corner = grid_3d
@@ -474,4 +482,73 @@ fn representative_sizes_record_stats() {
     assert!(a.stats.elapsed_ms >= 0.0);
     assert!(b.stats.elapsed_ms >= 0.0);
     assert!(c.stats.elapsed_ms >= 0.0);
+}
+
+#[test]
+fn boundary_stitching_wraps_neighbors_and_produces_seamless_edges() {
+    let white = WfcTileId(0);
+    let mut request = WfcRequest::new(
+        WfcGridSize::new_2d(6, 4),
+        alternating_rules_2d(),
+        WfcSeed(21),
+    );
+    request.boundary_stitching = WfcBoundaryStitching::xy();
+    request.fixed_cells = vec![WfcFixedCell::new(UVec3::new(0, 0, 0), white)];
+
+    let solution = solve_wfc(&request).expect("wrapped checkerboard should solve");
+    verify_solution(&request, &solution);
+
+    for y in 0..request.grid_size.height {
+        let left = solution
+            .grid
+            .tile_at(UVec3::new(0, y, 0))
+            .expect("left edge tile");
+        let right = solution
+            .grid
+            .tile_at(UVec3::new(request.grid_size.width - 1, y, 0))
+            .expect("right edge tile");
+        assert_ne!(left, right);
+    }
+}
+
+#[test]
+fn hex_topology_uses_six_neighbor_directions() {
+    let grass = WfcTileId(0);
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Hex2d,
+        vec![WfcTileDefinition::new(grass, 1.0, "Grass")],
+    )
+    .with_rule(grass, WfcDirection::HexEast, [grass])
+    .with_rule(grass, WfcDirection::HexWest, [grass])
+    .with_rule(grass, WfcDirection::HexNorthEast, [grass])
+    .with_rule(grass, WfcDirection::HexNorthWest, [grass])
+    .with_rule(grass, WfcDirection::HexSouthEast, [grass])
+    .with_rule(grass, WfcDirection::HexSouthWest, [grass]);
+
+    let request = WfcRequest::new(WfcGridSize::new_2d(4, 4), ruleset, WfcSeed(88));
+    let solution = solve_wfc(&request).expect("hex rules should solve");
+    verify_solution(&request, &solution);
+
+    let grid = super::solver::grid::CompiledGrid::new(
+        WfcTopology::Hex2d,
+        WfcGridSize::new_2d(4, 4),
+        WfcBoundaryStitching::default(),
+    )
+    .expect("hex grid should compile");
+    let center = grid
+        .index_of(UVec3::new(1, 1, 0))
+        .expect("hex center should exist");
+    let neighbors = [
+        WfcDirection::HexEast,
+        WfcDirection::HexWest,
+        WfcDirection::HexNorthEast,
+        WfcDirection::HexNorthWest,
+        WfcDirection::HexSouthEast,
+        WfcDirection::HexSouthWest,
+    ]
+    .into_iter()
+    .filter_map(|direction| grid.neighbor(center, direction))
+    .collect::<Vec<_>>();
+
+    assert_eq!(neighbors.len(), 6);
 }

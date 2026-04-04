@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use saddle_pane::prelude::*;
 use saddle_procgen_wfc::solve_wfc;
-use saddle_procgen_wfc_example_support as common;
+#[path = "../../shared/support.rs"]
+mod common;
 
 #[derive(Resource, Clone, PartialEq)]
 struct VoxelConfig {
@@ -69,7 +70,13 @@ fn main() {
         }),
         ..default()
     }));
-    app.add_plugins(PanePlugin);
+    app.add_plugins((
+        bevy_flair::FlairPlugin,
+        bevy_input_focus::InputDispatchPlugin,
+        bevy_ui_widgets::UiWidgetsPlugins,
+        bevy_input_focus::tab_navigation::TabNavigationPlugin,
+        PanePlugin,
+    ));
     app.register_pane::<VoxelPane>();
     common::install_auto_exit(&mut app);
     app.add_systems(Startup, setup);

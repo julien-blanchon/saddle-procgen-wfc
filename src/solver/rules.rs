@@ -45,9 +45,7 @@ impl CompiledRuleset {
             {
                 return Err(format!("duplicate tile id {:?}", tile.id));
             }
-            if ruleset.topology == WfcTopology::Cartesian3d
-                && tile.symmetry != WfcTileSymmetry::Fixed
-            {
+            if ruleset.topology != WfcTopology::Cartesian2d && tile.symmetry != WfcTileSymmetry::Fixed {
                 return Err(format!(
                     "tile {:?} uses {:?}, but automatic rotation currently supports only Cartesian2d",
                     tile.id, tile.symmetry
@@ -278,6 +276,13 @@ fn rotate_direction_clockwise(direction: WfcDirection) -> WfcDirection {
         WfcDirection::YNeg => WfcDirection::XNeg,
         WfcDirection::XNeg => WfcDirection::YPos,
         WfcDirection::YPos => WfcDirection::XPos,
-        WfcDirection::ZPos | WfcDirection::ZNeg => direction,
+        WfcDirection::ZPos
+        | WfcDirection::ZNeg
+        | WfcDirection::HexEast
+        | WfcDirection::HexWest
+        | WfcDirection::HexNorthEast
+        | WfcDirection::HexNorthWest
+        | WfcDirection::HexSouthEast
+        | WfcDirection::HexSouthWest => direction,
     }
 }

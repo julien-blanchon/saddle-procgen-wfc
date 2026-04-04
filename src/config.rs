@@ -26,6 +26,7 @@ pub enum WfcTopology {
     #[default]
     Cartesian2d,
     Cartesian3d,
+    Hex2d,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect)]
@@ -36,6 +37,12 @@ pub enum WfcDirection {
     YNeg,
     ZPos,
     ZNeg,
+    HexEast,
+    HexWest,
+    HexNorthEast,
+    HexNorthWest,
+    HexSouthEast,
+    HexSouthWest,
 }
 
 impl WfcDirection {
@@ -50,6 +57,14 @@ impl WfcDirection {
                 Self::ZPos,
                 Self::ZNeg,
             ],
+            WfcTopology::Hex2d => &[
+                Self::HexEast,
+                Self::HexWest,
+                Self::HexNorthEast,
+                Self::HexNorthWest,
+                Self::HexSouthEast,
+                Self::HexSouthWest,
+            ],
         }
     }
 
@@ -61,6 +76,12 @@ impl WfcDirection {
             Self::YNeg => Self::YPos,
             Self::ZPos => Self::ZNeg,
             Self::ZNeg => Self::ZPos,
+            Self::HexEast => Self::HexWest,
+            Self::HexWest => Self::HexEast,
+            Self::HexNorthEast => Self::HexSouthWest,
+            Self::HexNorthWest => Self::HexSouthEast,
+            Self::HexSouthEast => Self::HexNorthWest,
+            Self::HexSouthWest => Self::HexNorthEast,
         }
     }
 
@@ -72,6 +93,12 @@ impl WfcDirection {
             Self::YNeg => -IVec3::Y,
             Self::ZPos => IVec3::Z,
             Self::ZNeg => -IVec3::Z,
+            Self::HexEast => IVec3::X,
+            Self::HexWest => -IVec3::X,
+            Self::HexNorthEast => IVec3::new(1, -1, 0),
+            Self::HexNorthWest => IVec3::new(0, -1, 0),
+            Self::HexSouthEast => IVec3::new(1, 1, 0),
+            Self::HexSouthWest => IVec3::new(0, 1, 0),
         }
     }
 }
@@ -125,6 +152,31 @@ impl Default for WfcGridSize {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+pub struct WfcBoundaryStitching {
+    pub wrap_x: bool,
+    pub wrap_y: bool,
+    pub wrap_z: bool,
+}
+
+impl WfcBoundaryStitching {
+    pub const fn xy() -> Self {
+        Self {
+            wrap_x: true,
+            wrap_y: true,
+            wrap_z: false,
+        }
+    }
+
+    pub const fn xyz() -> Self {
+        Self {
+            wrap_x: true,
+            wrap_y: true,
+            wrap_z: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Reflect)]
 pub struct WfcTileDefinition {
     pub id: WfcTileId,
@@ -165,7 +217,7 @@ impl WfcTileSymmetry {
                 Self::Rotate2 => 2,
                 Self::Rotate4 => 4,
             },
-            WfcTopology::Cartesian3d => 1,
+            WfcTopology::Cartesian3d | WfcTopology::Hex2d => 1,
         }
     }
 }
@@ -316,6 +368,7 @@ pub struct WfcRequest {
     pub ruleset: WfcRuleset,
     pub seed: WfcSeed,
     pub settings: WfcSettings,
+    pub boundary_stitching: WfcBoundaryStitching,
     pub fixed_cells: Vec<WfcFixedCell>,
     pub banned_cells: Vec<WfcCellBans>,
     pub border_constraints: Vec<WfcBorderConstraint>,
@@ -329,6 +382,7 @@ impl WfcRequest {
             ruleset,
             seed,
             settings: WfcSettings::default(),
+            boundary_stitching: WfcBoundaryStitching::default(),
             fixed_cells: Vec::new(),
             banned_cells: Vec::new(),
             border_constraints: Vec::new(),

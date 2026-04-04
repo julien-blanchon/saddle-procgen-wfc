@@ -1,8 +1,10 @@
+#![allow(dead_code)]
+
 use bevy::prelude::*;
 use saddle_procgen_wfc::{
-    WfcBorder, WfcBorderConstraint, WfcDirection, WfcFixedCell, WfcGlobalConstraint, WfcGridSize,
-    WfcRequest, WfcRuleset, WfcSeed, WfcSettings, WfcTileCountConstraint, WfcTileDefinition,
-    WfcTileId, WfcTileSymmetry, WfcTopology,
+    WfcBorder, WfcBorderConstraint, WfcBoundaryStitching, WfcDirection, WfcFixedCell,
+    WfcGlobalConstraint, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcSettings,
+    WfcTileCountConstraint, WfcTileDefinition, WfcTileId, WfcTileSymmetry, WfcTopology,
 };
 use std::borrow::Cow;
 use std::time::Duration;
@@ -243,6 +245,65 @@ pub fn contradiction_request(seed: u64) -> WfcRequest {
         .border_constraints
         .push(WfcBorderConstraint::new(WfcBorder::MinX, [WfcTileId(0)]));
     request
+}
+
+pub fn stitched_request(seed: u64) -> WfcRequest {
+    let white = WfcTileId(0);
+    let black = WfcTileId(1);
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(white, 1.0, "White"),
+            WfcTileDefinition::new(black, 1.0, "Black"),
+        ],
+    )
+    .with_rule(white, WfcDirection::XPos, [black])
+    .with_rule(white, WfcDirection::XNeg, [black])
+    .with_rule(white, WfcDirection::YPos, [black])
+    .with_rule(white, WfcDirection::YNeg, [black])
+    .with_rule(black, WfcDirection::XPos, [white])
+    .with_rule(black, WfcDirection::XNeg, [white])
+    .with_rule(black, WfcDirection::YPos, [white])
+    .with_rule(black, WfcDirection::YNeg, [white]);
+
+    let mut request = WfcRequest::new(WfcGridSize::new_2d(6, 4), ruleset, WfcSeed(seed));
+    request.boundary_stitching = WfcBoundaryStitching::xy();
+    request.fixed_cells = vec![WfcFixedCell::new(UVec3::new(0, 0, 0), white)];
+    request
+}
+
+pub fn hex_request(seed: u64) -> WfcRequest {
+    let grass = WfcTileId(0);
+    let grove = WfcTileId(1);
+    let water = WfcTileId(2);
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Hex2d,
+        vec![
+            WfcTileDefinition::new(grass, 4.0, "Grass"),
+            WfcTileDefinition::new(grove, 2.0, "Grove"),
+            WfcTileDefinition::new(water, 1.0, "Water"),
+        ],
+    )
+    .with_rule(grass, WfcDirection::HexEast, [grass, grove, water])
+    .with_rule(grass, WfcDirection::HexWest, [grass, grove, water])
+    .with_rule(grass, WfcDirection::HexNorthEast, [grass, grove, water])
+    .with_rule(grass, WfcDirection::HexNorthWest, [grass, grove, water])
+    .with_rule(grass, WfcDirection::HexSouthEast, [grass, grove, water])
+    .with_rule(grass, WfcDirection::HexSouthWest, [grass, grove, water])
+    .with_rule(grove, WfcDirection::HexEast, [grass, grove])
+    .with_rule(grove, WfcDirection::HexWest, [grass, grove])
+    .with_rule(grove, WfcDirection::HexNorthEast, [grass, grove])
+    .with_rule(grove, WfcDirection::HexNorthWest, [grass, grove])
+    .with_rule(grove, WfcDirection::HexSouthEast, [grass, grove])
+    .with_rule(grove, WfcDirection::HexSouthWest, [grass, grove])
+    .with_rule(water, WfcDirection::HexEast, [grass, water])
+    .with_rule(water, WfcDirection::HexWest, [grass, water])
+    .with_rule(water, WfcDirection::HexNorthEast, [grass, water])
+    .with_rule(water, WfcDirection::HexNorthWest, [grass, water])
+    .with_rule(water, WfcDirection::HexSouthEast, [grass, water])
+    .with_rule(water, WfcDirection::HexSouthWest, [grass, water]);
+
+    WfcRequest::new(WfcGridSize::new_2d(10, 8), ruleset, WfcSeed(seed))
 }
 
 pub fn color_for_tile_2d(tile: WfcTileId) -> Color {

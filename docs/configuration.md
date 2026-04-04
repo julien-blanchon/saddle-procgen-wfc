@@ -29,6 +29,7 @@ Helpers:
 | `ruleset` | `WfcRuleset` | required | Tile definitions plus explicit adjacency |
 | `seed` | `WfcSeed` | required | Deterministic branch order and weighted sampling |
 | `settings` | `WfcSettings` | `WfcSettings::default()` | Solver heuristics and debug capture |
+| `boundary_stitching` | `WfcBoundaryStitching` | disabled | Wraps neighbor queries across the chosen axes for seamless chunk edges |
 | `fixed_cells` | `Vec<WfcFixedCell>` | empty | Pre-collapsed cells applied before propagation |
 | `banned_cells` | `Vec<WfcCellBans>` | empty | Per-cell domain removals applied before propagation |
 | `border_constraints` | `Vec<WfcBorderConstraint>` | empty | Allowed tiles for border planes |
@@ -55,7 +56,7 @@ Tradeoffs:
 
 | Field | Type | Effect |
 | --- | --- | --- |
-| `topology` | `WfcTopology` | Selects 2D or 3D active directions |
+| `topology` | `WfcTopology` | Selects 2D, 3D, or hex active directions |
 | `tiles` | `Vec<WfcTileDefinition>` | Declares all valid tile ids, family weights, and optional rotation symmetry |
 | `adjacency` | `Vec<WfcAdjacencyRule>` | Explicit allowed-neighbor table |
 
@@ -84,7 +85,7 @@ Helpers:
 
 ## `WfcTileSymmetry`
 
-Use symmetry only for `Cartesian2d` rulesets.
+Use symmetry only for `Cartesian2d` rulesets. `Cartesian3d` and `Hex2d` currently require `Fixed`.
 
 - `Fixed`: one authored orientation, no automatic rotation
 - `Rotate2`: two unique quarter-turn states, useful for straight corridors or roads
@@ -118,6 +119,42 @@ Restricts every cell on one border plane to the listed tiles.
 
 This is the main v1 tool for chunk seams and fixed-boundary solves.
 For auto-rotated tiles, border constraints apply to the full tile family, not just one specific quarter-turn.
+
+## `WfcBoundaryStitching`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `wrap_x` | `bool` | `false` | Wraps left/right neighbors across the X seam |
+| `wrap_y` | `bool` | `false` | Wraps top/bottom neighbors across the Y seam |
+| `wrap_z` | `bool` | `false` | Wraps front/back neighbors across the Z seam |
+
+Helpers:
+
+- `WfcBoundaryStitching::xy()` for toroidal 2D layouts
+- `WfcBoundaryStitching::xyz()` for fully wrapped 3D grids
+
+## Overlap-model Requests
+
+### `WfcOverlapRequest`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `sample` | `WfcTileGrid` | required | 2D sample patch library used to extract overlapping patterns |
+| `output_size` | `WfcGridSize` | required | Target output dimensions; depth must remain `1` |
+| `seed` | `WfcSeed` | required | Deterministic branch order for the derived pattern solve |
+| `settings` | `WfcSettings` | `WfcSettings::default()` | Observation heuristic, backtrack cap, and debug capture |
+| `options` | `WfcOverlapOptions` | see below | Pattern window and periodic sampling/output controls |
+
+### `WfcOverlapOptions`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `pattern_width` | `u32` | `3` | Horizontal size of each learned sample pattern |
+| `pattern_height` | `u32` | `3` | Vertical size of each learned sample pattern |
+| `periodic_input` | `bool` | `true` | Wraps sampling over the source patch so edge windows still contribute patterns |
+| `periodic_output` | `bool` | `false` | Wraps the derived pattern solve through `WfcBoundaryStitching::xy()` |
+
+`solve_overlap_wfc_2d(&WfcOverlapRequest)` extracts overlapping patterns, builds a transient tiled-model ruleset, solves it, and maps the anchor tile/rotation back into the returned `WfcSolution`.
 
 ## Global Constraints
 

@@ -1,22 +1,34 @@
 use bevy::prelude::*;
 
-use crate::{WfcBorder, WfcDirection, WfcGridSize, WfcTopology};
+use crate::{WfcBorder, WfcBoundaryStitching, WfcDirection, WfcGridSize, WfcTopology};
 
 #[derive(Clone, Debug)]
 pub struct CompiledGrid {
     topology: WfcTopology,
     size: WfcGridSize,
+    boundary_stitching: WfcBoundaryStitching,
 }
 
 impl CompiledGrid {
-    pub fn new(topology: WfcTopology, size: WfcGridSize) -> Result<Self, String> {
+    pub fn new(
+        topology: WfcTopology,
+        size: WfcGridSize,
+        boundary_stitching: WfcBoundaryStitching,
+    ) -> Result<Self, String> {
         if size.width == 0 || size.height == 0 || size.depth == 0 {
             return Err("grid dimensions must be greater than zero".to_string());
         }
         if matches!(topology, WfcTopology::Cartesian2d) && size.depth != 1 {
             return Err("2D topology requires depth = 1".to_string());
         }
-        Ok(Self { topology, size })
+        if matches!(topology, WfcTopology::Hex2d) && size.depth != 1 {
+            return Err("hex topology requires depth = 1".to_string());
+        }
+        Ok(Self {
+            topology,
+            size,
+            boundary_stitching,
+        })
     }
 
     pub fn topology(&self) -> WfcTopology {
@@ -64,11 +76,11 @@ impl CompiledGrid {
 
     pub fn neighbor(&self, index: usize, direction: WfcDirection) -> Option<usize> {
         let current = self.position_of(index).as_ivec3();
-        let next = current + direction.offset();
-        if next.x < 0 || next.y < 0 || next.z < 0 {
-            return None;
-        }
-        self.index_of(next.as_uvec3())
+        let next = match self.topology {
+            WfcTopology::Cartesian2d | WfcTopology::Cartesian3d => current + direction.offset(),
+            WfcTopology::Hex2d => hex_neighbor(current, direction),
+        };
+        self.wrap_or_reject(next)
     }
 
     pub fn is_on_border(&self, index: usize, border: WfcBorder) -> bool {
@@ -82,4 +94,64 @@ impl CompiledGrid {
             WfcBorder::MaxZ => position.z + 1 == self.size.depth,
         }
     }
+}
+
+impl CompiledGrid {
+    fn wrap_or_reject(&self, next: IVec3) -> Option<usize> {
+        let wrapped = IVec3::new(
+            wrap_axis(next.x, self.size.width, self.boundary_stitching.wrap_x)?,
+            wrap_axis(next.y, self.size.height, self.boundary_stitching.wrap_y)?,
+            wrap_axis(next.z, self.size.depth, self.boundary_stitching.wrap_z)?,
+        );
+        self.index_of(wrapped.as_uvec3())
+    }
+}
+
+fn wrap_axis(value: i32, extent: u32, wrap: bool) -> Option<i32> {
+    let extent = extent as i32;
+    if (0..extent).contains(&value) {
+        return Some(value);
+    }
+    if !wrap || extent <= 0 {
+        return None;
+    }
+    Some(value.rem_euclid(extent))
+}
+
+fn hex_neighbor(current: IVec3, direction: WfcDirection) -> IVec3 {
+    let odd_row = current.y.rem_euclid(2) != 0;
+    let delta = match direction {
+        WfcDirection::HexEast => IVec3::new(1, 0, 0),
+        WfcDirection::HexWest => IVec3::new(-1, 0, 0),
+        WfcDirection::HexNorthEast => {
+            if odd_row {
+                IVec3::new(1, -1, 0)
+            } else {
+                IVec3::new(0, -1, 0)
+            }
+        }
+        WfcDirection::HexNorthWest => {
+            if odd_row {
+                IVec3::new(0, -1, 0)
+            } else {
+                IVec3::new(-1, -1, 0)
+            }
+        }
+        WfcDirection::HexSouthEast => {
+            if odd_row {
+                IVec3::new(1, 1, 0)
+            } else {
+                IVec3::new(0, 1, 0)
+            }
+        }
+        WfcDirection::HexSouthWest => {
+            if odd_row {
+                IVec3::new(0, 1, 0)
+            } else {
+                IVec3::new(-1, 1, 0)
+            }
+        }
+        _ => IVec3::ZERO,
+    };
+    current + delta
 }

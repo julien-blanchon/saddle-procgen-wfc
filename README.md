@@ -1,6 +1,6 @@
 # Saddle Procgen WFC
 
-Reusable Wave Function Collapse / Model Synthesis toolkit for deterministic 2D and 3D cartesian grid solving in Bevy.
+Reusable Wave Function Collapse / Model Synthesis toolkit for deterministic cartesian, stitched, overlap-derived, and hex-grid solving in Bevy.
 
 `saddle-procgen-wfc` keeps the solver output generic: it produces tile identifiers, chosen quarter-turn rotations for auto-rotated families, solve stats, contradiction diagnostics, and optional debug snapshots. Spawning sprites, meshes, colliders, or gameplay entities is left to consuming crates and examples.
 
@@ -94,8 +94,9 @@ Use `WfcPlugin::new(activate, deactivate, update)` when the runtime job layer sh
 | --- | --- |
 | `WfcPlugin` | Thin async Bevy runtime for background solves and job/result messages |
 | `WfcSystems` | Public ordering hooks: `Request`, `PollJobs`, `ApplyResults`, `Debug` |
-| `WfcRequest`, `WfcSettings`, `WfcSeed`, `WfcGridSize` | Core request/config surface |
+| `WfcRequest`, `WfcSettings`, `WfcSeed`, `WfcGridSize`, `WfcBoundaryStitching` | Core request/config surface |
 | `WfcRuleset`, `WfcTileDefinition`, `WfcAdjacencyRule`, `WfcTileSymmetry` | Explicit tiled-model rules plus optional 2D auto-rotation |
+| `WfcOverlapRequest`, `WfcOverlapOptions`, `solve_overlap_wfc_2d` | Sample-derived overlap-model solve path for 2D patch libraries |
 | `WfcFixedCell`, `WfcCellBans`, `WfcBorderConstraint` | Local hard constraints |
 | `WfcGlobalConstraint::TileCount` | Generic min/max tile count pruning |
 | `GenerateWfc`, `WfcSolved`, `WfcFailed`, `WfcProgress` | Runtime request/result messages |
@@ -105,8 +106,10 @@ Use `WfcPlugin::new(activate, deactivate, update)` when the runtime job layer sh
 
 ## What Ships In v1
 
-- Explicit adjacency-rule solving for 2D and 3D cartesian grids
+- Explicit adjacency-rule solving for 2D, 3D, and hex-grid topologies
 - Optional 2D tile-family auto-rotation with `Fixed`, `Rotate2`, and `Rotate4` symmetry
+- Boundary stitching through wrapped X/Y/Z neighbor evaluation for chunk seams and toroidal worlds
+- Overlap-model solving from 2D sample patches via `solve_overlap_wfc_2d`
 - Deterministic seeded observation and weighted sampling
 - AC-3-style propagation over dense compatibility masks
 - Explicit backtracking with rollback trail
@@ -132,14 +135,15 @@ Use `WfcPlugin::new(activate, deactivate, update)` when the runtime job layer sh
 | `voxel_3d` | Pane-driven 3D voxel solve with live volume controls | `cargo run -p saddle-procgen-wfc-example-voxel-3d` |
 | `async_runtime` | Message-driven async solve with live request controls | `cargo run -p saddle-procgen-wfc-example-async-runtime` |
 | `debug_entropy` | Pane-driven contradiction heatmap with live seed control | `cargo run -p saddle-procgen-wfc-example-debug-entropy` |
+| `tilemap_overlap` | Tilemap-facing overlap-model showcase driven from a learned patch sample | `cargo run -p saddle-procgen-wfc-example-tilemap-overlap` |
 | `saddle-procgen-wfc-lab` | Crate-local BRP/E2E verification app | `cargo run -p saddle-procgen-wfc-lab` |
 
 Interactive examples can auto-exit for scripted verification with `WFC_EXAMPLE_EXIT_AFTER_SECONDS=<seconds>`.
 
 ## Scope Notes
 
-- v1 focuses on the simple tiled model with explicit adjacency rules.
-- Overlapping WFC, sample-derived rule extraction, and richer non-local constraints are intentionally left as future extensions.
+- v1 now ships both the explicit tiled model and a sample-derived 2D overlap-model helper.
+- Richer overlap features such as rotated pattern augmentation, multi-tile objects, and larger non-local authoring constraints are still future extensions.
 - The runtime plugin solves in the background, but the pure solver is synchronous by design so tools and tests can use it directly.
 
 See [docs/architecture.md](docs/architecture.md) for solver internals and [docs/configuration.md](docs/configuration.md) for every public knob.

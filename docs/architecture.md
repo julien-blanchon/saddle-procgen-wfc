@@ -37,6 +37,38 @@ adjacency[variant][direction] = rotated compatibility bitset
 
 The public output still reports the logical tile id, plus a separate chosen rotation per collapsed cell.
 
+## Boundary Stitching
+
+`WfcBoundaryStitching` is folded into `CompiledGrid`, not layered on top of propagation later.
+
+- neighbor lookup stays the single source of truth for ordinary and wrapped grids
+- border constraints still apply to the rectangular bounding box, even when neighbor lookup wraps
+- overlap-model periodic output reuses the same wrapped-neighbor path through `WfcBoundaryStitching::xy()`
+
+This keeps chunk-seam and toroidal behavior inside the grid topology layer instead of duplicating it in the solver.
+
+## Hex Topology
+
+`WfcTopology::Hex2d` keeps the rest of the solver unchanged by changing only:
+
+- the active direction set
+- neighbor lookup in `CompiledGrid`
+- authoring expectations for adjacency rules
+
+Hex grids currently use fixed tile families rather than auto-rotated symmetry expansion, which keeps the public ruleset explicit while avoiding a second rotation system on top of the cartesian quarter-turn path.
+
+## Overlap-model Helper
+
+`solve_overlap_wfc_2d(&WfcOverlapRequest)` is implemented as a thin builder over the same tiled-model core:
+
+1. read overlapping windows from a sample `WfcTileGrid`
+2. deduplicate those windows into transient pattern tiles
+3. derive compatibility from overlap equality
+4. solve through the existing tiled-model solver
+5. map the chosen pattern anchors back into the returned `WfcSolution`
+
+This means overlap output still benefits from the same seeded branching, backtracking, diagnostics, and runtime-free pure solve path as explicit authored rulesets.
+
 ## Propagation Strategy
 
 The crate uses an AC-3-style propagation loop over precomputed compatibility masks.
@@ -132,9 +164,9 @@ The plugin is deliberately small:
 
 ## Planned Extension Points
 
-- sample-derived rule import helpers
+- rotated or mirrored overlap-pattern augmentation
 - partial sub-block repair APIs
 - alternate propagation backends such as support-count AC-4
-- overlapping-model support on top of the same request/result shell
+- multi-tile object placement on top of the current request/result shell
 
 The current API is kept intentionally narrow so those extensions can add new builders or helper layers without forcing a rewrite of `WfcRequest`, `WfcRuleset`, `WfcSolution`, or the async Bevy job shell.
