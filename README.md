@@ -15,6 +15,7 @@ saddle-procgen-wfc = { git = "https://github.com/julien-blanchon/saddle-procgen-
 Pure solver usage:
 
 ```rust
+use bevy::prelude::UVec3;
 use saddle_procgen_wfc::{
     WfcDirection, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcTileDefinition, WfcTileId,
     WfcTileSymmetry, WfcTopology, solve_wfc,
