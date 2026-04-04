@@ -2,9 +2,74 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 use saddle_pane::prelude::*;
-use saddle_procgen_wfc::WfcSolution;
+use saddle_procgen_wfc::{
+    WfcBorder, WfcBorderConstraint, WfcDirection, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed,
+    WfcSolution, WfcTileDefinition, WfcTileId, WfcTileSymmetry, WfcTopology, solve_wfc,
+};
 #[path = "../../shared/support.rs"]
 mod common;
+
+// ---------------------------------------------------------------------------
+// Tile definitions with symmetry annotations. `Rotate2` means the solver will
+// generate a 180-degree variant automatically; `Rotate4` gives all four
+// 90-degree rotations. Adjacency rules are authored for rotation 0 only --
+// the solver mirrors them to rotated variants.
+// ---------------------------------------------------------------------------
+
+fn autorotation_request(seed: u64, width: u32, height: u32) -> WfcRequest {
+    let meadow = WfcTileId(0);
+    let straight = WfcTileId(1);
+    let corner = WfcTileId(2);
+    let water = WfcTileId(3);
+
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(meadow, 4.0, "Meadow"),
+            // A straight road segment -- authored facing north/south.
+            // Rotate2 generates an east/west variant.
+            WfcTileDefinition::new(straight, 1.2, "Road Straight")
+                .with_symmetry(WfcTileSymmetry::Rotate2),
+            // A corner road segment -- authored facing NE.
+            // Rotate4 generates NW, SW, SE variants.
+            WfcTileDefinition::new(corner, 0.8, "Road Corner")
+                .with_symmetry(WfcTileSymmetry::Rotate4),
+            WfcTileDefinition::new(water, 0.9, "Water"),
+        ],
+    )
+    // Meadow can neighbor anything.
+    .with_rule(meadow, WfcDirection::XPos, [meadow, straight, corner, water])
+    .with_rule(meadow, WfcDirection::XNeg, [meadow, straight, corner, water])
+    .with_rule(meadow, WfcDirection::YPos, [meadow, straight, corner, water])
+    .with_rule(meadow, WfcDirection::YNeg, [meadow, straight, corner, water])
+    // Straight (north/south) has road sides on Y, open sides on X.
+    .with_rule(straight, WfcDirection::XPos, [meadow, water])
+    .with_rule(straight, WfcDirection::XNeg, [meadow, water])
+    .with_rule(straight, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(straight, WfcDirection::YNeg, [meadow, straight, corner])
+    // Corner (NE) has road on +X and +Y, open on -X and -Y.
+    .with_rule(corner, WfcDirection::XPos, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::XNeg, [meadow, water])
+    .with_rule(corner, WfcDirection::YPos, [meadow, straight, corner])
+    .with_rule(corner, WfcDirection::YNeg, [meadow, water])
+    // Water clusters (no road adjacency).
+    .with_rule(water, WfcDirection::XPos, [meadow, water])
+    .with_rule(water, WfcDirection::XNeg, [meadow, water])
+    .with_rule(water, WfcDirection::YPos, [meadow, water])
+    .with_rule(water, WfcDirection::YNeg, [meadow, water]);
+
+    let mut request = WfcRequest::new(WfcGridSize::new_2d(width, height), ruleset, WfcSeed(seed));
+    // Keep borders road-free.
+    request.border_constraints = vec![
+        WfcBorderConstraint::new(WfcBorder::MinX, [meadow, water]),
+        WfcBorderConstraint::new(WfcBorder::MaxX, [meadow, water]),
+        WfcBorderConstraint::new(WfcBorder::MinY, [meadow, water]),
+        WfcBorderConstraint::new(WfcBorder::MaxY, [meadow, water]),
+    ];
+    request
+}
+
+// ---------------------------------------------------------------------------
 
 #[derive(Resource, Clone, PartialEq)]
 struct AutoRotationConfig {
@@ -124,10 +189,8 @@ fn regenerate_solution(config: Res<AutoRotationConfig>, mut solution: ResMut<Cur
         return;
     }
 
-    let request = common::autorotation_request(config.seed, config.width, config.height);
-    solution.0 = Some(
-        saddle_procgen_wfc::solve_wfc(&request).expect("auto-rotation request should solve"),
-    );
+    let request = autorotation_request(config.seed, config.width, config.height);
+    solution.0 = Some(solve_wfc(&request).expect("auto-rotation request should solve"));
 }
 
 fn render_solution(
@@ -281,7 +344,7 @@ fn update_overlay(
     ));
 }
 
-fn ground_color(tile: saddle_procgen_wfc::WfcTileId) -> Color {
+fn ground_color(tile: WfcTileId) -> Color {
     match tile.0 {
         3 => Color::srgb(0.16, 0.41, 0.66),
         _ => Color::srgb(0.24, 0.45, 0.23),

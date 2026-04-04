@@ -1,8 +1,60 @@
 use bevy::prelude::*;
 use saddle_pane::prelude::*;
-use saddle_procgen_wfc::solve_wfc;
+use saddle_procgen_wfc::{
+    WfcDirection, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcTileDefinition, WfcTileId,
+    WfcTopology, solve_wfc,
+};
 #[path = "../../shared/support.rs"]
 mod common;
+
+// ---------------------------------------------------------------------------
+// 3D voxel tileset with 6-direction adjacency. Three tile types form
+// vertical structures: stone pillars capped by a decorative top.
+// ---------------------------------------------------------------------------
+
+fn voxel_request(seed: u64, width: u32, height: u32, depth: u32) -> WfcRequest {
+    let air = WfcTileId(0);
+    let stone = WfcTileId(1);
+    let cap = WfcTileId(2);
+
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian3d,
+        vec![
+            WfcTileDefinition::new(air, 3.0, "Air"),
+            WfcTileDefinition::new(stone, 2.0, "Stone"),
+            WfcTileDefinition::new(cap, 1.0, "Cap"),
+        ],
+    )
+    // Air can neighbor anything laterally and above; below only air or cap.
+    .with_rule(air, WfcDirection::XPos, [air, stone, cap])
+    .with_rule(air, WfcDirection::XNeg, [air, stone, cap])
+    .with_rule(air, WfcDirection::YPos, [air, stone, cap])
+    .with_rule(air, WfcDirection::YNeg, [air, stone, cap])
+    .with_rule(air, WfcDirection::ZPos, [air, cap])
+    .with_rule(air, WfcDirection::ZNeg, [air, stone, cap])
+    // Stone forms pillars: only stone or air laterally, stone or cap above, stone below.
+    .with_rule(stone, WfcDirection::XPos, [stone, air])
+    .with_rule(stone, WfcDirection::XNeg, [stone, air])
+    .with_rule(stone, WfcDirection::YPos, [stone, air])
+    .with_rule(stone, WfcDirection::YNeg, [stone, air])
+    .with_rule(stone, WfcDirection::ZPos, [stone, cap])
+    .with_rule(stone, WfcDirection::ZNeg, [stone])
+    // Cap only appears on top of stone and has air above.
+    .with_rule(cap, WfcDirection::XPos, [cap, air])
+    .with_rule(cap, WfcDirection::XNeg, [cap, air])
+    .with_rule(cap, WfcDirection::YPos, [cap, air])
+    .with_rule(cap, WfcDirection::YNeg, [cap, air])
+    .with_rule(cap, WfcDirection::ZPos, [air])
+    .with_rule(cap, WfcDirection::ZNeg, [stone]);
+
+    WfcRequest::new(
+        WfcGridSize::new_3d(width, height, depth),
+        ruleset,
+        WfcSeed(seed),
+    )
+}
+
+// ---------------------------------------------------------------------------
 
 #[derive(Resource, Clone, PartialEq)]
 struct VoxelConfig {
@@ -140,9 +192,7 @@ fn regenerate_solution(config: Res<VoxelConfig>, mut solution: ResMut<CurrentSol
     if !config.is_changed() && solution.0.is_some() {
         return;
     }
-    let mut request = common::voxel_request(config.seed);
-    request.grid_size =
-        saddle_procgen_wfc::WfcGridSize::new_3d(config.width, config.height, config.depth);
+    let request = voxel_request(config.seed, config.width, config.height, config.depth);
     solution.0 = Some(solve_wfc(&request).expect("voxel request should solve"));
 }
 
@@ -165,7 +215,7 @@ fn render_solution(
     }
 
     let cube = meshes.add(Cuboid::new(0.92, 0.92, 0.92));
-    let air = saddle_procgen_wfc::WfcTileId(0);
+    let air = WfcTileId(0);
     commands
         .spawn((
             VoxelRoot,

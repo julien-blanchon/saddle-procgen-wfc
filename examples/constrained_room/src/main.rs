@@ -1,8 +1,98 @@
 use bevy::prelude::*;
 use saddle_pane::prelude::*;
-use saddle_procgen_wfc::solve_wfc;
+use saddle_procgen_wfc::{
+    WfcBorder, WfcBorderConstraint, WfcDirection, WfcFixedCell, WfcGlobalConstraint, WfcGridSize,
+    WfcRequest, WfcRuleset, WfcSeed, WfcTileCountConstraint, WfcTileDefinition, WfcTileId,
+    WfcTopology, solve_wfc,
+};
 #[path = "../../shared/support.rs"]
 mod common;
+
+// ---------------------------------------------------------------------------
+// Constrained room: fixed entrances, border walls, and floor-count constraint.
+// ---------------------------------------------------------------------------
+
+fn constrained_room_request(seed: u64) -> WfcRequest {
+    let wall = WfcTileId(0);
+    let floor = WfcTileId(1);
+    let entrance = WfcTileId(2);
+    let exit = WfcTileId(3);
+    let room_neighbors = [wall, floor, entrance, exit];
+    let border_neighbors = [wall, entrance, exit];
+
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(wall, 1.0, "Wall"),
+            WfcTileDefinition::new(floor, 6.0, "Floor"),
+            WfcTileDefinition::new(entrance, 1.0, "Entrance"),
+            WfcTileDefinition::new(exit, 1.0, "Exit"),
+        ],
+    )
+    // Wall and floor can neighbor anything inside the room.
+    .with_rule(wall, WfcDirection::XPos, room_neighbors)
+    .with_rule(wall, WfcDirection::XNeg, room_neighbors)
+    .with_rule(wall, WfcDirection::YPos, room_neighbors)
+    .with_rule(wall, WfcDirection::YNeg, room_neighbors)
+    .with_rule(floor, WfcDirection::XPos, room_neighbors)
+    .with_rule(floor, WfcDirection::XNeg, room_neighbors)
+    .with_rule(floor, WfcDirection::YPos, room_neighbors)
+    .with_rule(floor, WfcDirection::YNeg, room_neighbors)
+    // Entrance faces inward (+X) and sits on the left border (-X = border only).
+    .with_rule(entrance, WfcDirection::XPos, room_neighbors)
+    .with_rule(entrance, WfcDirection::XNeg, border_neighbors)
+    .with_rule(entrance, WfcDirection::YPos, room_neighbors)
+    .with_rule(entrance, WfcDirection::YNeg, room_neighbors)
+    // Exit faces inward (-X) and sits on the right border (+X = border only).
+    .with_rule(exit, WfcDirection::XPos, border_neighbors)
+    .with_rule(exit, WfcDirection::XNeg, room_neighbors)
+    .with_rule(exit, WfcDirection::YPos, room_neighbors)
+    .with_rule(exit, WfcDirection::YNeg, room_neighbors);
+
+    let mut request = WfcRequest::new(WfcGridSize::new_2d(16, 10), ruleset, WfcSeed(seed));
+
+    // Pin the entrance at the left wall and the exit at the right wall.
+    request.fixed_cells = vec![
+        WfcFixedCell::new(UVec3::new(0, 5, 0), entrance),
+        WfcFixedCell::new(UVec3::new(15, 4, 0), exit),
+    ];
+
+    // Force borders to only contain walls (plus entrance/exit on their sides).
+    request.border_constraints = vec![
+        WfcBorderConstraint::new(WfcBorder::MinX, [wall, entrance]),
+        WfcBorderConstraint::new(WfcBorder::MaxX, [wall, exit]),
+        WfcBorderConstraint::new(WfcBorder::MinY, [wall]),
+        WfcBorderConstraint::new(WfcBorder::MaxY, [wall]),
+    ];
+
+    // Guarantee at least 60 floor tiles so the room has usable interior space.
+    request
+        .global_constraints
+        .push(WfcGlobalConstraint::TileCount(WfcTileCountConstraint {
+            tile: floor,
+            min_count: Some(60),
+            max_count: None,
+        }));
+    // Exactly one entrance and one exit.
+    request
+        .global_constraints
+        .push(WfcGlobalConstraint::TileCount(WfcTileCountConstraint {
+            tile: entrance,
+            min_count: Some(1),
+            max_count: Some(1),
+        }));
+    request
+        .global_constraints
+        .push(WfcGlobalConstraint::TileCount(WfcTileCountConstraint {
+            tile: exit,
+            min_count: Some(1),
+            max_count: Some(1),
+        }));
+
+    request
+}
+
+// ---------------------------------------------------------------------------
 
 #[derive(Resource, Clone, PartialEq)]
 struct RoomConfig {
@@ -106,7 +196,7 @@ fn regenerate_solution(config: Res<RoomConfig>, mut solution: ResMut<CurrentSolu
         return;
     }
     solution.0 =
-        Some(solve_wfc(&common::constrained_room_request(config.seed)).expect("room should solve"));
+        Some(solve_wfc(&constrained_room_request(config.seed)).expect("room should solve"));
 }
 
 fn render_solution(
@@ -144,8 +234,8 @@ fn render_solution(
                         .tile_at(UVec3::new(x, y, 0))
                         .expect("tile should exist");
                     let color = match tile.0 {
-                        2 => Color::srgb(0.16, 0.72, 0.62),
-                        3 => Color::srgb(0.88, 0.42, 0.22),
+                        2 => Color::srgb(0.16, 0.72, 0.62), // entrance
+                        3 => Color::srgb(0.88, 0.42, 0.22), // exit
                         _ => common::color_for_tile_2d(tile),
                     };
                     parent.spawn((

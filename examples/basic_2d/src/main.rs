@@ -1,8 +1,51 @@
 use bevy::prelude::*;
 use saddle_pane::prelude::*;
-use saddle_procgen_wfc::solve_wfc;
+use saddle_procgen_wfc::{
+    WfcDirection, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcTileDefinition, WfcTileId,
+    WfcTopology, solve_wfc,
+};
 #[path = "../../shared/support.rs"]
 mod common;
+
+// ---------------------------------------------------------------------------
+// Tile definitions and adjacency rules -- the core of any WFC setup.
+// ---------------------------------------------------------------------------
+
+fn basic_request(seed: u64, width: u32, height: u32) -> WfcRequest {
+    let meadow = WfcTileId(0);
+    let road = WfcTileId(1);
+    let water = WfcTileId(2);
+    let all = [meadow, road, water];
+
+    // Define tiles with relative weights -- meadow is most common, water rarest.
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(meadow, 5.0, "Meadow"),
+            WfcTileDefinition::new(road, 2.0, "Road"),
+            WfcTileDefinition::new(water, 1.0, "Water"),
+        ],
+    )
+    // Meadow can neighbor anything.
+    .with_rule(meadow, WfcDirection::XPos, all)
+    .with_rule(meadow, WfcDirection::XNeg, all)
+    .with_rule(meadow, WfcDirection::YPos, all)
+    .with_rule(meadow, WfcDirection::YNeg, all)
+    // Roads connect to meadow or other roads (no water-road adjacency).
+    .with_rule(road, WfcDirection::XPos, [meadow, road])
+    .with_rule(road, WfcDirection::XNeg, [meadow, road])
+    .with_rule(road, WfcDirection::YPos, [meadow, road])
+    .with_rule(road, WfcDirection::YNeg, [meadow, road])
+    // Water connects to meadow or other water (no water-road adjacency).
+    .with_rule(water, WfcDirection::XPos, [meadow, water])
+    .with_rule(water, WfcDirection::XNeg, [meadow, water])
+    .with_rule(water, WfcDirection::YPos, [meadow, water])
+    .with_rule(water, WfcDirection::YNeg, [meadow, water]);
+
+    WfcRequest::new(WfcGridSize::new_2d(width, height), ruleset, WfcSeed(seed))
+}
+
+// ---------------------------------------------------------------------------
 
 #[derive(Resource, Clone, PartialEq)]
 struct BasicConfig {
@@ -122,8 +165,7 @@ fn regenerate_solution(config: Res<BasicConfig>, mut solution: ResMut<CurrentSol
         return;
     }
 
-    let mut request = common::basic_request(config.seed);
-    request.grid_size = saddle_procgen_wfc::WfcGridSize::new_2d(config.width, config.height);
+    let request = basic_request(config.seed, config.width, config.height);
     solution.0 = Some(solve_wfc(&request).expect("basic request should solve"));
 }
 

@@ -1,8 +1,100 @@
 use bevy::prelude::*;
 use saddle_pane::prelude::*;
-use saddle_procgen_wfc::{WfcFailureReason, solve_wfc};
+use saddle_procgen_wfc::{
+    WfcBorder, WfcBorderConstraint, WfcDirection, WfcFailureReason, WfcFixedCell,
+    WfcGlobalConstraint, WfcGridSize, WfcRequest, WfcRuleset, WfcSeed, WfcSettings,
+    WfcTileCountConstraint, WfcTileDefinition, WfcTileId, WfcTopology, solve_wfc,
+};
 #[path = "../../shared/support.rs"]
 mod common;
+
+// ---------------------------------------------------------------------------
+// Build a request that is designed to produce a contradiction, with debug
+// snapshots enabled so we can visualize entropy at the moment of failure.
+// ---------------------------------------------------------------------------
+
+fn contradiction_request(seed: u64) -> WfcRequest {
+    let wall = WfcTileId(0);
+    let floor = WfcTileId(1);
+    let entrance = WfcTileId(2);
+    let exit = WfcTileId(3);
+    let room_neighbors = [wall, floor, entrance, exit];
+    let border_neighbors = [wall, entrance, exit];
+
+    // Start from a constrained room setup ...
+    let ruleset = WfcRuleset::new(
+        WfcTopology::Cartesian2d,
+        vec![
+            WfcTileDefinition::new(wall, 1.0, "Wall"),
+            WfcTileDefinition::new(floor, 6.0, "Floor"),
+            WfcTileDefinition::new(entrance, 1.0, "Entrance"),
+            WfcTileDefinition::new(exit, 1.0, "Exit"),
+        ],
+    )
+    .with_rule(wall, WfcDirection::XPos, room_neighbors)
+    .with_rule(wall, WfcDirection::XNeg, room_neighbors)
+    .with_rule(wall, WfcDirection::YPos, room_neighbors)
+    .with_rule(wall, WfcDirection::YNeg, room_neighbors)
+    .with_rule(floor, WfcDirection::XPos, room_neighbors)
+    .with_rule(floor, WfcDirection::XNeg, room_neighbors)
+    .with_rule(floor, WfcDirection::YPos, room_neighbors)
+    .with_rule(floor, WfcDirection::YNeg, room_neighbors)
+    .with_rule(entrance, WfcDirection::XPos, room_neighbors)
+    .with_rule(entrance, WfcDirection::XNeg, border_neighbors)
+    .with_rule(entrance, WfcDirection::YPos, room_neighbors)
+    .with_rule(entrance, WfcDirection::YNeg, room_neighbors)
+    .with_rule(exit, WfcDirection::XPos, border_neighbors)
+    .with_rule(exit, WfcDirection::XNeg, room_neighbors)
+    .with_rule(exit, WfcDirection::YPos, room_neighbors)
+    .with_rule(exit, WfcDirection::YNeg, room_neighbors);
+
+    let mut request = WfcRequest::new(WfcGridSize::new_2d(16, 10), ruleset, WfcSeed(seed));
+    request.fixed_cells = vec![
+        WfcFixedCell::new(UVec3::new(0, 5, 0), entrance),
+        WfcFixedCell::new(UVec3::new(15, 4, 0), exit),
+    ];
+    request.border_constraints = vec![
+        WfcBorderConstraint::new(WfcBorder::MinX, [wall, entrance]),
+        WfcBorderConstraint::new(WfcBorder::MaxX, [wall, exit]),
+        WfcBorderConstraint::new(WfcBorder::MinY, [wall]),
+        WfcBorderConstraint::new(WfcBorder::MaxY, [wall]),
+    ];
+    request
+        .global_constraints
+        .push(WfcGlobalConstraint::TileCount(WfcTileCountConstraint {
+            tile: floor,
+            min_count: Some(60),
+            max_count: None,
+        }));
+    request
+        .global_constraints
+        .push(WfcGlobalConstraint::TileCount(WfcTileCountConstraint {
+            tile: entrance,
+            min_count: Some(1),
+            max_count: Some(1),
+        }));
+    request
+        .global_constraints
+        .push(WfcGlobalConstraint::TileCount(WfcTileCountConstraint {
+            tile: exit,
+            min_count: Some(1),
+            max_count: Some(1),
+        }));
+
+    // ... then enable debug snapshots and add an extra conflicting constraint
+    // that forces MinX to be wall-only (conflicting with the pinned entrance).
+    request.settings = WfcSettings {
+        capture_debug_snapshot: true,
+        ..default()
+    };
+    request
+        .border_constraints
+        .push(WfcBorderConstraint::new(WfcBorder::MinX, [wall]));
+
+    request
+}
+
+// ---------------------------------------------------------------------------
 
 #[derive(Resource, Clone, PartialEq)]
 struct EntropyConfig {
@@ -105,7 +197,7 @@ fn regenerate_failure(config: Res<EntropyConfig>, mut failure: ResMut<CurrentFai
     if !config.is_changed() && failure.0.is_some() {
         return;
     }
-    let next = solve_wfc(&common::contradiction_request(config.seed))
+    let next = solve_wfc(&contradiction_request(config.seed))
         .expect_err("debug view expects contradiction");
     assert_eq!(next.reason, WfcFailureReason::Contradiction);
     failure.0 = Some(next);
