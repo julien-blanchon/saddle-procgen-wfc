@@ -44,14 +44,7 @@ fn exit_after_seconds(
 }
 
 pub fn spatial_root(name: impl Into<Cow<'static, str>>, transform: Transform) -> impl Bundle {
-    (
-        Name::new(name),
-        transform,
-        GlobalTransform::default(),
-        Visibility::Visible,
-        InheritedVisibility::VISIBLE,
-        ViewVisibility::default(),
-    )
+    (Name::new(name), transform, Visibility::Visible)
 }
 
 pub fn basic_request(seed: u64) -> WfcRequest {
@@ -168,10 +161,26 @@ pub fn autorotation_request(seed: u64, width: u32, height: u32) -> WfcRequest {
             WfcTileDefinition::new(water, 0.9, "Water"),
         ],
     )
-    .with_rule(meadow, WfcDirection::XPos, [meadow, straight, corner, water])
-    .with_rule(meadow, WfcDirection::XNeg, [meadow, straight, corner, water])
-    .with_rule(meadow, WfcDirection::YPos, [meadow, straight, corner, water])
-    .with_rule(meadow, WfcDirection::YNeg, [meadow, straight, corner, water])
+    .with_rule(
+        meadow,
+        WfcDirection::XPos,
+        [meadow, straight, corner, water],
+    )
+    .with_rule(
+        meadow,
+        WfcDirection::XNeg,
+        [meadow, straight, corner, water],
+    )
+    .with_rule(
+        meadow,
+        WfcDirection::YPos,
+        [meadow, straight, corner, water],
+    )
+    .with_rule(
+        meadow,
+        WfcDirection::YNeg,
+        [meadow, straight, corner, water],
+    )
     .with_rule(straight, WfcDirection::XPos, [meadow, water])
     .with_rule(straight, WfcDirection::XNeg, [meadow, water])
     .with_rule(straight, WfcDirection::YPos, [meadow, straight, corner])

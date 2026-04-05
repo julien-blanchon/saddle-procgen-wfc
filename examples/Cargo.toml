@@ -7,6 +7,8 @@ members = [
     "async_runtime",
     "debug_entropy",
     "tilemap_overlap",
+    "step_visualizer",
+    "interactive",
     "lab",
 ]
 resolver = "3"

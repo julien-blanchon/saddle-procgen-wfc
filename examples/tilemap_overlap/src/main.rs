@@ -5,8 +5,8 @@ use saddle_procgen_wfc::{
     WfcTopology, solve_overlap_wfc_2d,
 };
 use saddle_world_tilemap::{
-    TileCell, TileLayerConfig, TileLayerRenderConfig, TileLayerState, Tilemap,
-    TilemapDebugOverlay, TilemapDebugSettings, TilemapGeometry, TilemapPlugin,
+    TileCell, TileLayerConfig, TileLayerRenderConfig, TileLayerState, Tilemap, TilemapDebugOverlay,
+    TilemapDebugSettings, TilemapGeometry, TilemapPlugin,
 };
 use saddle_world_tilemap_example_support as support;
 
@@ -103,12 +103,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (
-                sync_pane_to_config,
-                support::sync_example_pane,
-                rebuild_map,
-            )
-                .chain(),
+            (sync_pane_to_config, support::sync_example_pane, rebuild_map).chain(),
         )
         .run();
 }
@@ -271,8 +266,7 @@ fn build_tilemap(
                     map.set_tile(
                         support::DETAIL_LAYER,
                         coord,
-                        TileCell::new(palette.tiles.flower)
-                            .with_tint(Color::srgb(1.0, 0.92, 0.84)),
+                        TileCell::new(palette.tiles.flower).with_tint(Color::srgb(1.0, 0.92, 0.84)),
                     );
                 }
                 _ => map.set_tile(
@@ -293,12 +287,9 @@ fn sample_patchwork() -> WfcTileGrid {
     let water = WfcTileId(2);
     let flowers = WfcTileId(3);
     let tiles = vec![
-        meadow, meadow, road, road, meadow, flowers,
-        meadow, road, road, meadow, meadow, flowers,
-        meadow, meadow, water, water, meadow, meadow,
-        road, road, water, meadow, meadow, meadow,
-        flowers, meadow, meadow, meadow, road, road,
-        flowers, meadow, meadow, road, road, meadow,
+        meadow, meadow, road, road, meadow, flowers, meadow, road, road, meadow, meadow, flowers,
+        meadow, meadow, water, water, meadow, meadow, road, road, water, meadow, meadow, meadow,
+        flowers, meadow, meadow, meadow, road, road, flowers, meadow, meadow, road, road, meadow,
     ];
 
     WfcTileGrid {

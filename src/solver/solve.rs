@@ -6,7 +6,7 @@ use rand_chacha::ChaCha8Rng;
 use crate::{
     WfcCellBans, WfcCellDebug, WfcContradiction, WfcDebugSnapshot, WfcFailure, WfcFailureReason,
     WfcGlobalConstraint, WfcObservationHeuristic, WfcRequest, WfcSolution, WfcSolveStats,
-    WfcTileCountConstraint, WfcTileGrid,
+    WfcTileCountConstraint, WfcTileGrid, WfcTileId, WfcTileVariant,
 };
 
 use super::{bitset::DomainBits, grid::CompiledGrid, rules::CompiledRuleset};
@@ -14,6 +14,150 @@ use super::{bitset::DomainBits, grid::CompiledGrid, rules::CompiledRuleset};
 #[allow(clippy::result_large_err)]
 pub fn solve_wfc(request: &WfcRequest) -> Result<WfcSolution, WfcFailure> {
     Solver::new(request)?.solve()
+}
+
+/// A snapshot of one cell's state during step-by-step solving.
+#[derive(Clone, Debug)]
+pub struct WfcStepCell {
+    pub possible_count: u32,
+    pub collapsed: Option<WfcTileVariant>,
+}
+
+/// A snapshot of the entire grid between observation steps.
+#[derive(Clone, Debug)]
+pub struct WfcStepSnapshot {
+    pub cells: Vec<WfcStepCell>,
+    pub observation_count: u32,
+    pub last_observed_position: Option<bevy::prelude::UVec3>,
+    pub finished: bool,
+    pub failed: bool,
+}
+
+/// Step-by-step WFC solver that yields intermediate snapshots.
+///
+/// Create with [`WfcStepSolver::new`], then call [`step`](WfcStepSolver::step)
+/// repeatedly until the returned snapshot has `finished == true`.
+pub struct WfcStepSolver<'a> {
+    inner: Solver<'a>,
+    constraints_applied: bool,
+}
+
+impl<'a> WfcStepSolver<'a> {
+    /// Create a new step solver for the given request.
+    #[allow(clippy::result_large_err)]
+    pub fn new(request: &'a WfcRequest) -> Result<Self, WfcFailure> {
+        Ok(Self {
+            inner: Solver::new(request)?,
+            constraints_applied: false,
+        })
+    }
+
+    /// Perform one observation+propagation step and return the current state.
+    ///
+    /// Returns `Ok(snapshot)` with `snapshot.finished == true` when the solve
+    /// is complete, or `Err(failure)` if a contradiction cannot be recovered.
+    #[allow(clippy::result_large_err)]
+    pub fn step(&mut self) -> Result<WfcStepSnapshot, WfcFailure> {
+        if !self.constraints_applied {
+            self.constraints_applied = true;
+            if let Err(reason) = self.inner.apply_input_constraints() {
+                return Err(self.inner.finish_failure(reason));
+            }
+        }
+
+        if self.inner.possible_counts.iter().all(|count| *count == 1) {
+            return Ok(self.snapshot(true, false));
+        }
+
+        let Some(cell) = self.inner.select_observation_cell() else {
+            return Ok(self.snapshot(true, false));
+        };
+
+        let mut ordered_choices = self.inner.weighted_choice_order(cell);
+        let Some(chosen_tile) = ordered_choices.pop() else {
+            self.inner
+                .record_contradiction(cell, "selected cell has no remaining tiles");
+            return Err(self.inner.finish_failure(SolveError::Contradiction));
+        };
+
+        self.inner.stats.observation_count = self.inner.stats.observation_count.saturating_add(1);
+        self.inner.last_observed = Some(cell);
+        self.inner.decisions.push(DecisionFrame {
+            trail_len: self.inner.trail.len(),
+            cell,
+            alternatives: ordered_choices,
+        });
+
+        if self
+            .inner
+            .assign_single(cell, chosen_tile)
+            .and_then(|_| self.inner.propagate())
+            .is_err()
+        {
+            match self.inner.backtrack() {
+                Ok(()) => {}
+                Err(reason) => return Err(self.inner.finish_failure(reason)),
+            }
+        }
+
+        let finished = self.inner.possible_counts.iter().all(|count| *count == 1);
+        Ok(self.snapshot(finished, false))
+    }
+
+    /// Finish the solver and produce the final `WfcSolution`.
+    ///
+    /// Only valid to call after a step returned `finished == true`.
+    #[allow(clippy::result_large_err)]
+    pub fn finish(mut self) -> Result<WfcSolution, WfcFailure> {
+        if self.inner.possible_counts.iter().all(|count| *count == 1) {
+            Ok(self.inner.finish_solution())
+        } else {
+            Err(self.inner.finish_failure(SolveError::Contradiction))
+        }
+    }
+
+    fn snapshot(&self, finished: bool, failed: bool) -> WfcStepSnapshot {
+        let cells = self
+            .inner
+            .domains
+            .iter()
+            .map(|domain| {
+                let count = domain.count() as u32;
+                let collapsed = if count == 1 {
+                    domain
+                        .first_one()
+                        .map(|index| self.inner.rules.tile_variant(index))
+                } else {
+                    None
+                };
+                WfcStepCell {
+                    possible_count: count,
+                    collapsed,
+                }
+            })
+            .collect();
+
+        WfcStepSnapshot {
+            cells,
+            observation_count: self.inner.stats.observation_count,
+            last_observed_position: self
+                .inner
+                .last_observed
+                .map(|index| self.inner.grid.position_of(index)),
+            finished,
+            failed,
+        }
+    }
+
+    /// Get the current tile id for a collapsed cell at a given flat index.
+    pub fn tile_at(&self, index: usize) -> Option<WfcTileId> {
+        let domain = self.inner.domains.get(index)?;
+        if domain.count() == 1 {
+            domain.first_one().map(|i| self.inner.rules.tile_id(i))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone)]

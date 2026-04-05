@@ -263,7 +263,6 @@ fn update_overlay(
     };
     **overlay = Text::new(format!(
         "constrained_room\nforced entrances, border walls, and floor-count constraint\nsignature: {}\nseed: {}",
-        solution.signature,
-        solution.seed.0
+        solution.signature, solution.seed.0
     ));
 }

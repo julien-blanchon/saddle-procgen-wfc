@@ -5038,6 +5038,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "saddle-procgen-wfc-example-interactive"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_flair",
+ "bevy_input_focus",
+ "bevy_ui_widgets",
+ "saddle-pane",
+ "saddle-procgen-wfc",
+]
+
+[[package]]
+name = "saddle-procgen-wfc-example-step-visualizer"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_flair",
+ "bevy_input_focus",
+ "bevy_ui_widgets",
+ "saddle-pane",
+ "saddle-procgen-wfc",
+]
+
+[[package]]
 name = "saddle-procgen-wfc-example-tilemap-overlap"
 version = "0.1.0"
 dependencies = [

@@ -21,7 +21,7 @@ pub use debug::{
 };
 pub use messages::{GenerateWfc, WfcFailed, WfcProgress, WfcSolved};
 pub use overlap::{WfcOverlapOptions, WfcOverlapRequest, solve_overlap_wfc_2d};
-pub use solver::solve_wfc;
+pub use solver::{WfcStepCell, WfcStepSnapshot, WfcStepSolver, solve_wfc};
 
 use bevy::{
     app::PostStartup,

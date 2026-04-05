@@ -38,10 +38,26 @@ fn autorotation_request(seed: u64, width: u32, height: u32) -> WfcRequest {
         ],
     )
     // Meadow can neighbor anything.
-    .with_rule(meadow, WfcDirection::XPos, [meadow, straight, corner, water])
-    .with_rule(meadow, WfcDirection::XNeg, [meadow, straight, corner, water])
-    .with_rule(meadow, WfcDirection::YPos, [meadow, straight, corner, water])
-    .with_rule(meadow, WfcDirection::YNeg, [meadow, straight, corner, water])
+    .with_rule(
+        meadow,
+        WfcDirection::XPos,
+        [meadow, straight, corner, water],
+    )
+    .with_rule(
+        meadow,
+        WfcDirection::XNeg,
+        [meadow, straight, corner, water],
+    )
+    .with_rule(
+        meadow,
+        WfcDirection::YPos,
+        [meadow, straight, corner, water],
+    )
+    .with_rule(
+        meadow,
+        WfcDirection::YNeg,
+        [meadow, straight, corner, water],
+    )
     // Straight (north/south) has road sides on Y, open sides on X.
     .with_rule(straight, WfcDirection::XPos, [meadow, water])
     .with_rule(straight, WfcDirection::XNeg, [meadow, water])
@@ -238,11 +254,14 @@ fn render_solution(
                                 origin.y + y as f32 * tile_size,
                                 0.0,
                             ),
-                            GlobalTransform::default(),
+                            Visibility::Visible,
                         ))
                         .with_children(|cell| {
                             cell.spawn((
-                                Sprite::from_color(ground_color(tile), Vec2::splat(tile_size - 2.0)),
+                                Sprite::from_color(
+                                    ground_color(tile),
+                                    Vec2::splat(tile_size - 2.0),
+                                ),
                                 Transform::from_xyz(0.0, 0.0, 0.0),
                             ));
                             match tile.0 {
@@ -251,7 +270,7 @@ fn render_solution(
                                         Quat::from_rotation_z(rotation_steps as f32 * FRAC_PI_2);
                                     cell.spawn((
                                         Transform::from_rotation(rotation),
-                                        GlobalTransform::default(),
+                                        Visibility::Visible,
                                     ))
                                     .with_children(|road| {
                                         road.spawn((
@@ -275,7 +294,7 @@ fn render_solution(
                                         Quat::from_rotation_z(rotation_steps as f32 * FRAC_PI_2);
                                     cell.spawn((
                                         Transform::from_rotation(rotation),
-                                        GlobalTransform::default(),
+                                        Visibility::Visible,
                                     ))
                                     .with_children(|road| {
                                         road.spawn((
@@ -337,10 +356,7 @@ fn update_overlay(
     };
     **overlay = Text::new(format!(
         "auto_rotation\nsignature: {}\nseed: {}\nsize: {}x{}\nstraight and corner roads are authored once and rotated by the solver",
-        solution.signature,
-        solution.seed.0,
-        solution.grid.size.width,
-        solution.grid.size.height
+        solution.signature, solution.seed.0, solution.grid.size.width, solution.grid.size.height
     ));
 }
 

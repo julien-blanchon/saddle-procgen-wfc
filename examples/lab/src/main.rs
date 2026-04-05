@@ -12,8 +12,8 @@ use bevy_brp_extras::BrpExtrasPlugin;
 use saddle_pane::prelude::*;
 
 use common::{
-    basic_request, color_for_tile_2d, constrained_room_request, contradiction_request,
-    hex_request, large_request, spatial_root, stitched_request,
+    basic_request, color_for_tile_2d, constrained_room_request, contradiction_request, hex_request,
+    large_request, spatial_root, stitched_request,
 };
 use saddle_procgen_wfc::{
     GenerateWfc, WfcFailure, WfcFailureReason, WfcPlugin, WfcRuntimeDiagnostics, WfcSolved,

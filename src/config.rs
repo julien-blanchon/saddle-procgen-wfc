@@ -3,6 +3,18 @@ use bevy::prelude::*;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect)]
 pub struct WfcTileId(pub u16);
 
+impl From<u16> for WfcTileId {
+    fn from(value: u16) -> Self {
+        Self(value)
+    }
+}
+
+impl From<WfcTileId> for u16 {
+    fn from(value: WfcTileId) -> Self {
+        value.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
 pub struct WfcSeed(pub u64);
 
@@ -278,6 +290,41 @@ impl WfcRuleset {
     ) {
         self.adjacency
             .push(WfcAdjacencyRule::new(tile, direction, allowed_tiles));
+    }
+
+    /// Add a symmetric rule: if `a` allows `b` in `direction`, then `b` allows `a`
+    /// in the opposite direction.
+    pub fn with_symmetric_rule(
+        mut self,
+        tile_a: impl Into<WfcTileId>,
+        direction: WfcDirection,
+        tile_b: impl Into<WfcTileId>,
+    ) -> Self {
+        let a = tile_a.into();
+        let b = tile_b.into();
+        self.adjacency
+            .push(WfcAdjacencyRule::new(a, direction, [b]));
+        self.adjacency
+            .push(WfcAdjacencyRule::new(b, direction.opposite(), [a]));
+        self
+    }
+
+    /// Add rules for all active directions at once: the given tile allows
+    /// the listed neighbors in every direction for the ruleset's topology.
+    pub fn with_all_direction_rules(
+        mut self,
+        tile: impl Into<WfcTileId>,
+        allowed_tiles: impl IntoIterator<Item = WfcTileId> + Clone,
+    ) -> Self {
+        let tile_id = tile.into();
+        for &direction in WfcDirection::active(self.topology) {
+            self.adjacency.push(WfcAdjacencyRule::new(
+                tile_id,
+                direction,
+                allowed_tiles.clone(),
+            ));
+        }
+        self
     }
 }
 

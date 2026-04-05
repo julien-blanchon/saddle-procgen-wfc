@@ -102,6 +102,7 @@ Use `WfcPlugin::new(activate, deactivate, update)` when the runtime job layer sh
 | `GenerateWfc`, `WfcSolved`, `WfcFailed`, `WfcProgress` | Runtime request/result messages |
 | `WfcJob`, `WfcJobResult`, `WfcRuntimeDiagnostics` | ECS-visible runtime inspection surface |
 | `solve_wfc(&WfcRequest)` | Synchronous pure-Rust solve for tools and tests |
+| `WfcStepSolver`, `WfcStepSnapshot`, `WfcStepCell` | Frame-by-frame stepping API for visualizations |
 | `WfcSolution`, `WfcFailure`, `WfcSolveStats`, `WfcDebugSnapshot`, `WfcTileVariant` | Output, chosen rotations, and diagnostics |
 
 ## What Ships In v1
@@ -116,6 +117,8 @@ Use `WfcPlugin::new(activate, deactivate, update)` when the runtime job layer sh
 - Fixed cells, per-cell bans, border restrictions, and tile-count constraints
 - Async Bevy job workflow using `AsyncComputeTaskPool`
 - Structured contradiction and debug snapshots for bad tilesets
+- Step-by-step solver API (`WfcStepSolver`) for frame-by-frame visualizations
+- Builder helpers: `with_symmetric_rule`, `with_all_direction_rules`, `From<u16>` for `WfcTileId`
 
 ## Design Notes
 
@@ -136,6 +139,8 @@ Use `WfcPlugin::new(activate, deactivate, update)` when the runtime job layer sh
 | `async_runtime` | Message-driven async solve with live request controls | `cargo run -p saddle-procgen-wfc-example-async-runtime` |
 | `debug_entropy` | Pane-driven contradiction heatmap with live seed control | `cargo run -p saddle-procgen-wfc-example-debug-entropy` |
 | `tilemap_overlap` | Tilemap-facing overlap-model showcase driven from a learned patch sample | `cargo run -p saddle-procgen-wfc-example-tilemap-overlap` |
+| `step_visualizer` | Watch WFC solve one cell at a time with entropy display and pause/resume | `cargo run -p saddle-procgen-wfc-example-step-visualizer` |
+| `interactive` | Click to pin tiles, WFC fills the rest around your placements | `cargo run -p saddle-procgen-wfc-example-interactive` |
 | `saddle-procgen-wfc-lab` | Crate-local BRP/E2E verification app | `cargo run -p saddle-procgen-wfc-lab` |
 
 Interactive examples can auto-exit for scripted verification with `WFC_EXAMPLE_EXIT_AFTER_SECONDS=<seconds>`.

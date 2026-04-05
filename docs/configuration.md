@@ -224,6 +224,47 @@ Each `WfcCellDebug` now exposes both:
 - `possible_tiles`: deduplicated logical tile ids
 - `possible_variants`: logical tile id plus rotation for each remaining candidate
 
+## Step-by-Step Solver
+
+`WfcStepSolver` exposes the solver one observation at a time, suitable for frame-by-frame visualization.
+
+```rust
+let solver = WfcStepSolver::new(&request)?;
+loop {
+    let snapshot = solver.step()?;
+    // snapshot.cells contains per-cell state (collapsed tile or possibility count)
+    // snapshot.last_observed_position highlights the cell just collapsed
+    if snapshot.finished { break; }
+}
+let solution = solver.finish()?;
+```
+
+### `WfcStepSnapshot`
+
+| Field | Type | Effect |
+| --- | --- | --- |
+| `cells` | `Vec<WfcStepCell>` | Per-cell state: collapsed tile or remaining possibility count |
+| `observation_count` | `u32` | Total observations performed so far |
+| `last_observed_position` | `Option<UVec3>` | Grid position of the most recently collapsed cell |
+| `finished` | `bool` | All cells collapsed successfully |
+| `failed` | `bool` | A contradiction was encountered |
+
+### `WfcStepCell`
+
+| Field | Type | Effect |
+| --- | --- | --- |
+| `possible_count` | `u32` | Remaining tile candidates (0 = contradiction) |
+| `collapsed` | `Option<WfcTileVariant>` | The chosen tile and rotation if collapsed |
+
+## Ruleset Builder Helpers
+
+`WfcRuleset` provides convenience builders to reduce boilerplate:
+
+- `with_symmetric_rule(tile_a, direction, tile_b)` — adds both `a→dir→b` and `b→opposite(dir)→a`
+- `with_all_direction_rules(tile, allowed_tiles)` — adds rules for every active direction in the topology
+
+`WfcTileId` supports `From<u16>` and `Into<u16>` for ergonomic numeric construction.
+
 ## Scaling Notes
 
 Memory and runtime scale with:

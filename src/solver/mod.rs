@@ -3,4 +3,4 @@ pub(crate) mod grid;
 pub(crate) mod rules;
 mod solve;
 
-pub use solve::solve_wfc;
+pub use solve::{WfcStepCell, WfcStepSnapshot, WfcStepSolver, solve_wfc};

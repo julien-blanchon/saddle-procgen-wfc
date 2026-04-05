@@ -162,6 +162,14 @@ The plugin is deliberately small:
 
 `WfcRuntimeDiagnostics` tracks aggregate job counts and the last observed outcome. This is useful for BRP and crate-local E2E verification.
 
+## Step-by-Step Solver
+
+`WfcStepSolver` wraps the internal `Solver` and exposes a single-observation-per-call interface. Each `step()` call performs one observe-then-propagate cycle and returns a `WfcStepSnapshot` containing the full grid state, the last observed position, and whether the solve is finished or failed.
+
+This is intentionally a thin wrapper — it reuses the same propagation, backtracking, and entropy heuristics as the batch solver. The snapshot copies cell state from the internal solver, so there is no coupling between visualization code and solver internals.
+
+The step solver borrows `&WfcRequest` for its lifetime, which means callers that need to persist it across frames (like Bevy systems) must manage the borrow appropriately. The `step_visualizer` example demonstrates a heap-pinned self-referential pattern for this.
+
 ## Planned Extension Points
 
 - rotated or mirrored overlap-pattern augmentation
