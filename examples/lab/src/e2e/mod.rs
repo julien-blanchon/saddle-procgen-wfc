@@ -120,6 +120,7 @@ pub fn scenario_by_name(name: &str) -> Option<Scenario> {
         "wfc_socket_builder" => Some(wfc_socket_builder()),
         "wfc_serde_roundtrip" => Some(wfc_serde_roundtrip()),
         "wfc_learned_rules" => Some(wfc_learned_rules()),
+        "wfc_keyboard_workflow" => Some(wfc_keyboard_workflow()),
         _ => None,
     }
 }
@@ -140,6 +141,7 @@ pub fn list_scenarios() -> Vec<&'static str> {
         "wfc_socket_builder",
         "wfc_serde_roundtrip",
         "wfc_learned_rules",
+        "wfc_keyboard_workflow",
     ]
 }
 
@@ -810,5 +812,83 @@ fn wfc_learned_rules() -> Scenario {
         .then(Action::Screenshot("wfc_learned_rules".into()))
         .then(Action::WaitFrames(1))
         .then(assertions::log_summary("wfc_learned_rules"))
+        .build()
+}
+
+fn wfc_keyboard_workflow() -> Scenario {
+    Scenario::builder("wfc_keyboard_workflow")
+        .description(
+            "Drive the lab through its keyboard shortcuts, switching views and triggering a regeneration so the interactive controls are covered through the public input path.",
+        )
+        .then(Action::WaitFrames(20))
+        .then(wait_for_view(LabView::Basic, LabSolveState::Solved))
+        .then(Action::Screenshot("wfc_keyboard_basic".into()))
+        .then(Action::HoldKey {
+            key: KeyCode::Digit2,
+            frames: 1,
+        })
+        .then(wait_for_view(LabView::Room, LabSolveState::Solved))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "room view is active",
+            |diagnostics| diagnostics.active_view == LabView::Room && diagnostics.visible_cells > 0,
+        ))
+        .then(inspect::log_resource::<LabDiagnostics>("wfc_keyboard_room"))
+        .then(Action::Screenshot("wfc_keyboard_room".into()))
+        .then(Action::WaitFrames(1))
+        .then(Action::HoldKey {
+            key: KeyCode::Digit4,
+            frames: 1,
+        })
+        .then(wait_for_running_jobs(LabView::Large))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "large view is running asynchronously",
+            |diagnostics| {
+                diagnostics.active_view == LabView::Large
+                    && diagnostics.solve_state == LabSolveState::Running
+                    && diagnostics.running_jobs >= 1
+            },
+        ))
+        .then(inspect::log_resource::<LabDiagnostics>("wfc_keyboard_large_running"))
+        .then(Action::Screenshot("wfc_keyboard_large_running".into()))
+        .then(Action::WaitUntil {
+            label: "large view solved".into(),
+            condition: Box::new(|world| {
+                let diagnostics = world.resource::<LabDiagnostics>();
+                diagnostics.active_view == LabView::Large
+                    && diagnostics.solve_state == LabSolveState::Solved
+                    && diagnostics.signature != 0
+            }),
+            max_frames: 240,
+        })
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "large view solved",
+            |diagnostics| diagnostics.active_view == LabView::Large
+                && diagnostics.solve_state == LabSolveState::Solved
+                && diagnostics.signature != 0,
+        ))
+        .then(inspect::log_resource::<LabDiagnostics>("wfc_keyboard_large_solved"))
+        .then(Action::Screenshot("wfc_keyboard_large_solved".into()))
+        .then(Action::WaitFrames(1))
+        .then(remember_signature())
+        .then(Action::HoldKey {
+            key: KeyCode::Space,
+            frames: 1,
+        })
+        .then(wait_for_new_signature(LabView::Large))
+        .then(assertions::resource_satisfies::<LabDiagnostics>(
+            "large view regenerated with a new signature",
+            |diagnostics| {
+                diagnostics.active_view == LabView::Large
+                    && diagnostics.solve_state == LabSolveState::Solved
+                    && diagnostics.signature != 0
+                    && diagnostics.regeneration_count >= 2
+            },
+        ))
+        .then(inspect::log_resource::<LabDiagnostics>(
+            "wfc_keyboard_large_regenerated",
+        ))
+        .then(Action::Screenshot("wfc_keyboard_large_regenerated".into()))
+        .then(Action::WaitFrames(1))
+        .then(assertions::log_summary("wfc_keyboard_workflow"))
         .build()
 }
