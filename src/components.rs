@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{WfcFailure, WfcFailureReason, WfcRequest, WfcSolution};
 
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
+#[derive(
+    Component, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize,
+)]
 pub struct WfcJobId(pub u64);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]

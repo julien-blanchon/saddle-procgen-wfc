@@ -1,7 +1,20 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Reflect,
+    Serialize,
+    Deserialize,
+)]
 pub struct WfcTileId(pub u16);
 
 impl From<u16> for WfcTileId {
@@ -58,7 +71,9 @@ impl std::fmt::Display for WfcTopology {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Serialize, Deserialize,
+)]
 pub enum WfcDirection {
     XPos,
     XNeg,
@@ -113,7 +128,6 @@ impl WfcDirection {
             Self::HexSouthWest => Self::HexNorthEast,
         }
     }
-
 }
 
 impl std::fmt::Display for WfcDirection {

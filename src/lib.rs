@@ -21,8 +21,8 @@ pub use debug::{
     WfcCellDebug, WfcContradiction, WfcDebugSnapshot, WfcFailure, WfcFailureReason, WfcSolution,
     WfcSolveStats, WfcTileGrid, WfcTileVariant,
 };
-pub use messages::{GenerateWfc, WfcFailed, WfcProgress, WfcSolved};
 pub use learn::learn_adjacency_rules;
+pub use messages::{GenerateWfc, WfcFailed, WfcProgress, WfcSolved};
 pub use overlap::{WfcOverlapOptions, WfcOverlapRequest, solve_overlap_wfc_2d};
 pub use sockets::{SocketTileBuilder, WfcSocketId, WfcSocketRulesetBuilder};
 pub use solver::{WfcStepCell, WfcStepSnapshot, WfcStepSolver, solve_wfc};

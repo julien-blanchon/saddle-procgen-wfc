@@ -116,8 +116,12 @@ impl WfcTileGrid {
 
     /// Iterate over all cells yielding `(position, variant)`.
     pub fn iter_variants(&self) -> impl Iterator<Item = (UVec3, WfcTileVariant)> + '_ {
-        (0..self.size.total_cells())
-            .map(move |i| (self.position_of(i), WfcTileVariant::new(self.tiles[i], self.rotations[i])))
+        (0..self.size.total_cells()).map(move |i| {
+            (
+                self.position_of(i),
+                WfcTileVariant::new(self.tiles[i], self.rotations[i]),
+            )
+        })
     }
 
     fn index_of(&self, position: UVec3) -> Option<usize> {

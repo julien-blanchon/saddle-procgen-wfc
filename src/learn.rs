@@ -100,7 +100,8 @@ mod tests {
         let black = WfcTileId(1);
 
         // Hand-place a 4x4 checkerboard
-        let mut sample = WfcTileGrid::new_empty(WfcTopology::Cartesian2d, WfcGridSize::new_2d(4, 4));
+        let mut sample =
+            WfcTileGrid::new_empty(WfcTopology::Cartesian2d, WfcGridSize::new_2d(4, 4));
         for y in 0..4u32 {
             for x in 0..4u32 {
                 let tile = if (x + y) % 2 == 0 { white } else { black };
@@ -134,7 +135,8 @@ mod tests {
         let road = WfcTileId(1);
 
         // Simple sample: road runs horizontally, grass above and below
-        let mut sample = WfcTileGrid::new_empty(WfcTopology::Cartesian2d, WfcGridSize::new_2d(6, 3));
+        let mut sample =
+            WfcTileGrid::new_empty(WfcTopology::Cartesian2d, WfcGridSize::new_2d(6, 3));
         for x in 0..6u32 {
             sample.set_tile_at(UVec3::new(x, 0, 0), grass);
             sample.set_tile_at(UVec3::new(x, 1, 0), road);
@@ -152,7 +154,8 @@ mod tests {
         let air = WfcTileId(0);
         let stone = WfcTileId(1);
 
-        let mut sample = WfcTileGrid::new_empty(WfcTopology::Cartesian3d, WfcGridSize::new_3d(3, 3, 3));
+        let mut sample =
+            WfcTileGrid::new_empty(WfcTopology::Cartesian3d, WfcGridSize::new_3d(3, 3, 3));
         // Bottom layer: all stone. Top layers: all air.
         for z in 0..3u32 {
             for y in 0..3u32 {

@@ -9,7 +9,20 @@ use crate::{
 };
 
 /// A unique socket type identifier.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Reflect,
+    Serialize,
+    Deserialize,
+)]
 pub struct WfcSocketId(pub u16);
 
 impl From<u16> for WfcSocketId {
@@ -180,8 +193,10 @@ impl WfcSocketRulesetBuilder {
                     .tiles
                     .iter()
                     .filter(|candidate| {
-                        let unique_rotations =
-                            candidate.definition.symmetry.unique_rotations(self.topology);
+                        let unique_rotations = candidate
+                            .definition
+                            .symmetry
+                            .unique_rotations(self.topology);
                         (0..unique_rotations).any(|rot| {
                             let candidate_socket =
                                 rotated_socket(candidate, opposite_dir, rot, self.topology);
@@ -225,8 +240,7 @@ impl<'a> SocketTileBuilder<'a> {
     /// Assign the same socket to all active directions for this topology.
     pub fn all_sockets(self, name: &str) -> Self {
         let socket_id = self.builder.socket_id(name);
-        let directions: Vec<WfcDirection> =
-            WfcDirection::active(self.builder.topology).to_vec();
+        let directions: Vec<WfcDirection> = WfcDirection::active(self.builder.topology).to_vec();
         for dir in directions {
             self.builder.tiles[self.tile_index]
                 .face_sockets
@@ -313,10 +327,7 @@ mod tests {
     #[test]
     fn socket_built_ruleset_solves() {
         let mut builder = WfcSocketRulesetBuilder::new(WfcTopology::Cartesian2d);
-        builder
-            .add_tile(0u16, 5.0, "Grass")
-            .all_sockets("g")
-            .done();
+        builder.add_tile(0u16, 5.0, "Grass").all_sockets("g").done();
         builder
             .add_tile(1u16, 2.0, "Road")
             .socket(WfcDirection::XPos, "road")
@@ -340,8 +351,8 @@ mod tests {
 
     #[test]
     fn asymmetric_sockets_enforce_directionality() {
-        let mut builder =
-            WfcSocketRulesetBuilder::new(WfcTopology::Cartesian2d).add_asymmetric_pair("pipe_in", "pipe_out");
+        let mut builder = WfcSocketRulesetBuilder::new(WfcTopology::Cartesian2d)
+            .add_asymmetric_pair("pipe_in", "pipe_out");
         builder
             .add_tile(0u16, 3.0, "Ground")
             .all_sockets("g")
@@ -391,10 +402,7 @@ mod tests {
     #[test]
     fn socket_builder_with_rotation() {
         let mut builder = WfcSocketRulesetBuilder::new(WfcTopology::Cartesian2d);
-        builder
-            .add_tile(0u16, 3.0, "Grass")
-            .all_sockets("g")
-            .done();
+        builder.add_tile(0u16, 3.0, "Grass").all_sockets("g").done();
         builder
             .add_tile(1u16, 1.0, "Straight Road")
             .socket(WfcDirection::XPos, "g")
