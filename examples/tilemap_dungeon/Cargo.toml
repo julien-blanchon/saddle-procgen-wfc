@@ -1,0 +1,21 @@
+[package]
+name = "saddle-procgen-wfc-example-tilemap-dungeon"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+e2e = ["dep:saddle-bevy-e2e"]
+
+[dependencies]
+bevy = { workspace = true }
+saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
+saddle-procgen-wfc = { workspace = true }
+saddle-world-tilemap = { git = "https://github.com/julien-blanchon/saddle-world-tilemap" }
+saddle-world-tilemap-example-support = { git = "https://github.com/julien-blanchon/saddle-world-tilemap", package = "saddle-world-tilemap-example-support" }
+saddle-ai-fov = { git = "https://github.com/julien-blanchon/saddle-ai-fov" }
+saddle-bevy-e2e = { git = "https://github.com/julien-blanchon/saddle-bevy-e2e", features = ["json"], optional = true }
+
+[lints]
+workspace = true

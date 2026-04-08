@@ -1,0 +1,22 @@
+[package]
+name = "saddle-procgen-wfc-example-voxel-wfc"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+e2e = ["dep:saddle-bevy-e2e"]
+
+[dependencies]
+bevy = { workspace = true }
+saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
+saddle-procgen-wfc = { workspace = true }
+saddle-world-voxel-world = { git = "https://github.com/julien-blanchon/saddle-world-voxel-world" }
+bevy_flair = { workspace = true }
+bevy_input_focus = { workspace = true }
+bevy_ui_widgets = { workspace = true }
+saddle-bevy-e2e = { git = "https://github.com/julien-blanchon/saddle-bevy-e2e", features = ["json"], optional = true }
+
+[lints]
+workspace = true
