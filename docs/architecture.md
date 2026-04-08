@@ -170,6 +170,67 @@ This is intentionally a thin wrapper — it reuses the same propagation, backtra
 
 The step solver borrows `&WfcRequest` for its lifetime, which means callers that need to persist it across frames (like Bevy systems) must manage the borrow appropriately. The `step_visualizer` example demonstrates a heap-pinned self-referential pattern for this.
 
+## Integration Layer
+
+The solver produces `WfcSolution` containing a `WfcTileGrid` — a flat array of `WfcTileId` values with optional rotation metadata. This output is intentionally generic. The integration layer is the consumer code that maps WFC tile ids to game-meaningful data. Here is how that mapping works for the primary integration targets:
+
+### Tilemap Integration
+
+`WfcTileId → TileKindId` mapping drives `saddle-world-tilemap`:
+
+1. Author a WFC ruleset where each tile id corresponds to a logical terrain type (wall, floor, door, water, etc.)
+2. Build a `TileCatalog` mapping each tile id to a `TileKind` with visual, collision, and movement cost data
+3. After solve, iterate `WfcTileGrid` and call `Tilemap::set_tile()` for each cell
+4. The tilemap plugin handles chunk meshing, autotiling, animation, collision descriptors, and pathfinding automatically
+
+The tilemap's collision layer becomes the bridge to downstream systems: FOV reads it for opacity, physics reads it for colliders.
+
+### FOV Integration
+
+`WfcTileId → opacity` mapping drives `saddle-ai-fov`:
+
+1. Define which WFC tile ids are opaque (walls, solid objects) vs transparent (floors, doors)
+2. Build a `GridOpacityMap` using `from_fn()` with the same dimensions as the WFC grid
+3. Insert it as a Bevy resource; all `GridFov` viewers automatically use it
+4. When the WFC grid changes (regeneration), rebuild the opacity map — the FOV plugin marks all viewers dirty
+
+The grid spec's `cell_size` and `origin` must match the tilemap geometry so grid coordinates align.
+
+### Navmesh Integration
+
+`WfcTileId → walkable geometry` mapping drives `saddle-ai-navmesh`:
+
+1. Classify WFC tiles as walkable (floor, door) or non-walkable (wall, water)
+2. For each walkable tile, spawn a `NavmeshSource` entity with a primitive quad at the tile's world position
+3. Optionally spawn obstacle sources for blocking tiles if agent radius carving is needed
+4. The navmesh plugin collects sources, bakes asynchronously, and provides pathfinding queries
+
+Tile world positions are computed from grid coordinates × tile size. The navmesh bakes in XZ space (Y-up), so 2D tilemap coordinates map to (x → X, y → Z).
+
+### Voxel World Integration
+
+`WfcTileId → BlockId` mapping drives `saddle-world-voxel-world`:
+
+1. Pre-solve a WFC 3D request covering the desired world volume
+2. Implement `VoxelBlockSampler` that looks up the WFC grid at each world position
+3. Map each WFC tile id to a `BlockId` registered in the `BlockRegistry`
+4. The voxel world plugin handles chunk streaming, greedy meshing, and collision generation
+
+For larger worlds, solve WFC per-chunk using `WfcSeed::for_chunk()` and `WfcBoundaryStitching` to ensure seam coherence.
+
+### Composition Pattern
+
+These integrations compose naturally. A typical full pipeline:
+
+```text
+WfcRequest → solve_wfc() → WfcSolution
+  ├→ Tilemap::set_tile()           → render chunks, collision descriptors
+  ├→ GridOpacityMap::from_fn()     → FOV visibility for all viewers
+  └→ NavmeshSource per floor tile  → baked navmesh, agent pathfinding
+```
+
+All three downstream systems read from the same WFC grid but produce independent outputs. The WFC crate has no dependency on any of them — the consumer example wires them together.
+
 ## Planned Extension Points
 
 - rotated or mirrored overlap-pattern augmentation

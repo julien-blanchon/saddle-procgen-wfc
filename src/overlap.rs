@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     WfcBoundaryStitching, WfcDirection, WfcFailure, WfcFailureReason, WfcGridSize, WfcRequest,
@@ -8,7 +9,7 @@ use crate::{
     WfcTileVariant, WfcTopology, solver::solve_wfc,
 };
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcOverlapOptions {
     pub pattern_width: u32,
     pub pattern_height: u32,
@@ -27,7 +28,7 @@ impl Default for WfcOverlapOptions {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcOverlapRequest {
     pub sample: WfcTileGrid,
     pub output_size: WfcGridSize,

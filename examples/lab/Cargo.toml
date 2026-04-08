@@ -18,6 +18,7 @@ bevy_input_focus = { workspace = true }
 bevy_ui_widgets = { workspace = true }
 bevy_brp_extras = { version = "0.19", optional = true }
 saddle-bevy-e2e = { git = "https://github.com/julien-blanchon/saddle-bevy-e2e", features = ["json"], optional = true }
+ron = { workspace = true }
 
 [lints]
 workspace = true

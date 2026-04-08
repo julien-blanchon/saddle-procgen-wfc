@@ -9,6 +9,7 @@ description = "Wave Function Collapse / Model Synthesis toolkit for reusable til
 
 [dependencies]
 bevy = { version = "0.18", features = ["serialize"] }
+serde = { version = "1", features = ["derive"] }
 rand = "0.9"
 rand_chacha = "0.9"
 

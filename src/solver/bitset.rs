@@ -4,6 +4,35 @@ pub struct DomainBits {
     bit_len: usize,
 }
 
+pub struct DomainBitsIter<'a> {
+    words: &'a [u64],
+    bit_len: usize,
+    word_index: usize,
+    current_word: u64,
+}
+
+impl Iterator for DomainBitsIter<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        while self.current_word == 0 {
+            self.word_index += 1;
+            if self.word_index >= self.words.len() {
+                return None;
+            }
+            self.current_word = self.words[self.word_index];
+        }
+        let bit = self.current_word.trailing_zeros() as usize;
+        let index = self.word_index * 64 + bit;
+        self.current_word &= self.current_word - 1;
+        if index < self.bit_len {
+            Some(index)
+        } else {
+            None
+        }
+    }
+}
+
 impl DomainBits {
     pub fn empty(bit_len: usize) -> Self {
         Self {
@@ -51,7 +80,16 @@ impl DomainBits {
         None
     }
 
-    #[cfg(test)]
+    pub fn iter_ones(&self) -> DomainBitsIter<'_> {
+        DomainBitsIter {
+            words: &self.words,
+            bit_len: self.bit_len,
+            word_index: 0,
+            current_word: self.words.first().copied().unwrap_or(0),
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn contains(&self, index: usize) -> bool {
         let word_index = index / 64;
         let bit_index = index % 64;
@@ -99,19 +137,9 @@ impl DomainBits {
             .any(|(left, right)| (*left & *right) != 0)
     }
 
+    #[allow(dead_code)]
     pub fn to_indices(&self) -> Vec<usize> {
-        let mut indices = Vec::with_capacity(self.count());
-        for (word_index, mut word) in self.words.iter().copied().enumerate() {
-            while word != 0 {
-                let bit = word.trailing_zeros() as usize;
-                let index = word_index * 64 + bit;
-                if index < self.bit_len {
-                    indices.push(index);
-                }
-                word &= word - 1;
-            }
-        }
-        indices
+        self.iter_ones().collect()
     }
 
     fn clear_unused_bits(&mut self) {

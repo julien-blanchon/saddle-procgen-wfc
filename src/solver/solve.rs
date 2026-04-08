@@ -347,7 +347,7 @@ impl<'a> Solver<'a> {
                 };
 
                 let mut supported = DomainBits::empty(self.rules.tile_count());
-                for tile_index in source_domain.to_indices() {
+                for tile_index in source_domain.iter_ones() {
                     supported.or_assign(self.rules.allowed_mask(direction, tile_index));
                 }
 
@@ -399,7 +399,7 @@ impl<'a> Solver<'a> {
     }
 
     fn weighted_choice_order(&mut self, cell: usize) -> Vec<usize> {
-        let mut candidates = self.domains[cell].to_indices();
+        let mut candidates: Vec<usize> = self.domains[cell].iter_ones().collect();
         let mut ordered = Vec::with_capacity(candidates.len());
 
         while !candidates.is_empty() {
@@ -552,7 +552,7 @@ impl<'a> Solver<'a> {
         }
         let mut weight_sum = 0.0f32;
         let mut weight_log_sum = 0.0f32;
-        for tile_index in self.domains[cell].to_indices() {
+        for tile_index in self.domains[cell].iter_ones() {
             let weight = self.rules.weight(tile_index);
             weight_sum += weight;
             weight_log_sum += weight * weight.ln();
@@ -563,13 +563,11 @@ impl<'a> Solver<'a> {
     fn record_contradiction(&mut self, cell: usize, note: &str) {
         self.stats.contradiction_count = self.stats.contradiction_count.saturating_add(1);
         let remaining_candidates = self.domains[cell]
-            .to_indices()
-            .into_iter()
+            .iter_ones()
             .map(|index| self.rules.tile_id(index))
             .collect();
         let remaining_variants = self.domains[cell]
-            .to_indices()
-            .into_iter()
+            .iter_ones()
             .map(|index| self.rules.tile_variant(index))
             .collect();
         self.last_contradiction = Some(WfcContradiction {
@@ -726,13 +724,11 @@ impl<'a> Solver<'a> {
             .enumerate()
             .map(|(cell, domain)| {
                 let possible_variants = domain
-                    .to_indices()
-                    .into_iter()
+                    .iter_ones()
                     .map(|index| self.rules.tile_variant(index))
                     .collect::<Vec<_>>();
                 let possible_tiles = domain
-                    .to_indices()
-                    .into_iter()
+                    .iter_ones()
                     .map(|index| self.rules.tile_id(index))
                     .collect::<Vec<_>>();
                 let collapsed_variant = domain

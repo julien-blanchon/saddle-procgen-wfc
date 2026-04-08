@@ -7,8 +7,14 @@ members = [
     "async_runtime",
     "debug_entropy",
     "tilemap_overlap",
+    "tilemap_dungeon",
+    "navmesh_dungeon",
+    "voxel_wfc",
     "step_visualizer",
     "interactive",
+    "socket_builder",
+    "data_driven",
+    "learned_rules",
     "lab",
 ]
 resolver = "3"
@@ -20,6 +26,8 @@ saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
 bevy_flair = "0.7"
 bevy_input_focus = "0.18"
 bevy_ui_widgets = "0.18"
+serde = { version = "1", features = ["derive"] }
+ron = "0.9"
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

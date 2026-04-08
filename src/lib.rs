@@ -3,8 +3,10 @@
 mod components;
 mod config;
 mod debug;
+mod learn;
 mod messages;
 mod overlap;
+mod sockets;
 mod solver;
 mod systems;
 
@@ -20,7 +22,9 @@ pub use debug::{
     WfcSolveStats, WfcTileGrid, WfcTileVariant,
 };
 pub use messages::{GenerateWfc, WfcFailed, WfcProgress, WfcSolved};
+pub use learn::learn_adjacency_rules;
 pub use overlap::{WfcOverlapOptions, WfcOverlapRequest, solve_overlap_wfc_2d};
+pub use sockets::{SocketTileBuilder, WfcSocketId, WfcSocketRulesetBuilder};
 pub use solver::{WfcStepCell, WfcStepSnapshot, WfcStepSolver, solve_wfc};
 
 use bevy::{
@@ -123,6 +127,7 @@ impl Plugin for WfcPlugin {
             .register_type::<WfcTileId>()
             .register_type::<WfcTileSymmetry>()
             .register_type::<WfcTileVariant>()
+            .register_type::<WfcSocketId>()
             .register_type::<WfcTopology>()
             .add_systems(self.activate_schedule, systems::activate_runtime)
             .add_systems(self.deactivate_schedule, systems::deactivate_runtime)

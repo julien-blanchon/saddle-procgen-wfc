@@ -1,11 +1,12 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::{WfcFailure, WfcFailureReason, WfcRequest, WfcSolution};
 
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub struct WfcJobId(pub u64);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub enum WfcJobStatus {
     Queued,
     #[default]
@@ -15,7 +16,7 @@ pub enum WfcJobStatus {
     Cancelled,
 }
 
-#[derive(Component, Clone, Debug, Reflect)]
+#[derive(Component, Clone, Debug, Reflect, Serialize, Deserialize)]
 pub struct WfcJob {
     pub id: WfcJobId,
     pub label: String,
@@ -23,13 +24,13 @@ pub struct WfcJob {
     pub request: WfcRequest,
 }
 
-#[derive(Component, Clone, Debug, Default, Reflect)]
+#[derive(Component, Clone, Debug, Default, Reflect, Serialize, Deserialize)]
 pub struct WfcJobResult {
     pub solution: Option<WfcSolution>,
     pub failure: Option<WfcFailure>,
 }
 
-#[derive(Resource, Clone, Debug, Reflect, Default)]
+#[derive(Resource, Clone, Debug, Reflect, Default, Serialize, Deserialize)]
 pub struct WfcRuntimeDiagnostics {
     pub active: bool,
     pub submitted_jobs: u64,

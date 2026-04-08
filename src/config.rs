@@ -1,6 +1,7 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect, Serialize, Deserialize)]
 pub struct WfcTileId(pub u16);
 
 impl From<u16> for WfcTileId {
@@ -15,7 +16,13 @@ impl From<WfcTileId> for u16 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+impl std::fmt::Display for WfcTileId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Tile({})", self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub struct WfcSeed(pub u64);
 
 impl WfcSeed {
@@ -33,7 +40,7 @@ impl WfcSeed {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub enum WfcTopology {
     #[default]
     Cartesian2d,
@@ -41,7 +48,17 @@ pub enum WfcTopology {
     Hex2d,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect)]
+impl std::fmt::Display for WfcTopology {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cartesian2d => write!(f, "Cartesian2D"),
+            Self::Cartesian3d => write!(f, "Cartesian3D"),
+            Self::Hex2d => write!(f, "Hex2D"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Serialize, Deserialize)]
 pub enum WfcDirection {
     XPos,
     XNeg,
@@ -97,6 +114,28 @@ impl WfcDirection {
         }
     }
 
+}
+
+impl std::fmt::Display for WfcDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::XPos => write!(f, "+X"),
+            Self::XNeg => write!(f, "-X"),
+            Self::YPos => write!(f, "+Y"),
+            Self::YNeg => write!(f, "-Y"),
+            Self::ZPos => write!(f, "+Z"),
+            Self::ZNeg => write!(f, "-Z"),
+            Self::HexEast => write!(f, "HexE"),
+            Self::HexWest => write!(f, "HexW"),
+            Self::HexNorthEast => write!(f, "HexNE"),
+            Self::HexNorthWest => write!(f, "HexNW"),
+            Self::HexSouthEast => write!(f, "HexSE"),
+            Self::HexSouthWest => write!(f, "HexSW"),
+        }
+    }
+}
+
+impl WfcDirection {
     pub fn offset(self) -> IVec3 {
         match self {
             Self::XPos => IVec3::X,
@@ -115,7 +154,7 @@ impl WfcDirection {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub enum WfcBorder {
     MinX,
     MaxX,
@@ -125,7 +164,7 @@ pub enum WfcBorder {
     MaxZ,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub struct WfcGridSize {
     pub width: u32,
     pub height: u32,
@@ -164,7 +203,7 @@ impl Default for WfcGridSize {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub struct WfcBoundaryStitching {
     pub wrap_x: bool,
     pub wrap_y: bool,
@@ -189,7 +228,7 @@ impl WfcBoundaryStitching {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcTileDefinition {
     pub id: WfcTileId,
     pub weight: f32,
@@ -213,7 +252,7 @@ impl WfcTileDefinition {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub enum WfcTileSymmetry {
     #[default]
     Fixed,
@@ -234,7 +273,7 @@ impl WfcTileSymmetry {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcAdjacencyRule {
     pub tile: WfcTileId,
     pub direction: WfcDirection,
@@ -255,7 +294,7 @@ impl WfcAdjacencyRule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcRuleset {
     pub topology: WfcTopology,
     pub tiles: Vec<WfcTileDefinition>,
@@ -328,7 +367,7 @@ impl WfcRuleset {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcFixedCell {
     pub position: UVec3,
     pub tile: WfcTileId,
@@ -343,7 +382,7 @@ impl WfcFixedCell {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcCellBans {
     pub position: UVec3,
     pub banned_tiles: Vec<WfcTileId>,
@@ -358,7 +397,7 @@ impl WfcCellBans {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcBorderConstraint {
     pub border: WfcBorder,
     pub allowed_tiles: Vec<WfcTileId>,
@@ -373,26 +412,26 @@ impl WfcBorderConstraint {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcTileCountConstraint {
     pub tile: WfcTileId,
     pub min_count: Option<u32>,
     pub max_count: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub enum WfcGlobalConstraint {
     TileCount(WfcTileCountConstraint),
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub enum WfcObservationHeuristic {
     MinimumRemainingValues,
     #[default]
     MinimumEntropy,
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcSettings {
     pub observation_heuristic: WfcObservationHeuristic,
     pub max_backtracks: u32,
@@ -409,7 +448,7 @@ impl Default for WfcSettings {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Reflect)]
+#[derive(Clone, Debug, PartialEq, Reflect, Serialize, Deserialize)]
 pub struct WfcRequest {
     pub grid_size: WfcGridSize,
     pub ruleset: WfcRuleset,

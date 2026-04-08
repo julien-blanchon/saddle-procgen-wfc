@@ -285,3 +285,71 @@ Suggested v1 expectations:
 - `32x32` 2D with a modest tileset should be comfortably interactive.
 - `64x64` 2D is reasonable for background generation.
 - `16x16x16` 3D is a practical upper bound for real-time debug usage unless the ruleset is simple.
+
+## Socket-Based Ruleset Builder
+
+`WfcSocketRulesetBuilder` provides an ergonomic alternative to hand-writing adjacency rules. Instead of specifying every `(tile, direction, allowed_tiles)` triple, you label each tile face with a named socket. Two tiles can be adjacent if their facing sockets are compatible.
+
+### `WfcSocketId`
+
+`WfcSocketId(u16)` identifies a socket type. Socket names are registered lazily via `builder.socket_id("name")` or implicitly via `.socket(direction, "name")`.
+
+### `WfcSocketRulesetBuilder`
+
+| Method | Effect |
+| --- | --- |
+| `new(topology)` | Create a builder for the given topology |
+| `socket_id(name)` | Register/lookup a socket name, returns `WfcSocketId` |
+| `add_asymmetric_pair(from, to)` | Declare a directional socket pair: `from` only connects to `to` |
+| `add_tile(id, weight, label)` | Begin tile definition, returns `SocketTileBuilder` |
+| `build()` | Compile sockets to `WfcRuleset` with derived adjacency rules |
+
+### `SocketTileBuilder`
+
+| Method | Effect |
+| --- | --- |
+| `socket(direction, name)` | Assign a socket to one face |
+| `all_sockets(name)` | Assign the same socket to all active directions |
+| `symmetry(sym)` | Set tile rotation symmetry (`Fixed`, `Rotate2`, `Rotate4`) |
+| `done()` | Finish this tile, return to parent builder |
+
+**Symmetric sockets** (default): socket "A" on `+X` matches socket "A" on `-X`. Two tiles connect if the source face socket equals the neighbor opposite-face socket.
+
+**Asymmetric sockets**: declared with `add_asymmetric_pair("in", "out")`. Socket "in" only matches "out" (and vice versa), never itself. Useful for directional connections like pipe flow.
+
+**Rotation interaction**: When a tile uses `Rotate2` or `Rotate4`, assign sockets for the canonical (rotation-0) orientation only. The existing solver rotation machinery handles the rest — rotated variants inherit sockets in the rotated directions.
+
+## Learn Adjacency from Example
+
+`learn_adjacency_rules(sample: &WfcTileGrid) -> WfcRuleset`
+
+Scans a hand-placed sample grid and extracts which tile pairs are actually adjacent in each direction. Produces a standard `WfcRuleset`:
+
+- **Tile weights** are derived from frequency in the sample (more common tiles get higher weight)
+- **Adjacency rules** contain exactly the tile pairs observed in the sample
+- For tiles that appear on the border (where a direction has no neighbor), all tiles are allowed as a conservative fallback
+- Works with all topologies (`Cartesian2d`, `Cartesian3d`, `Hex2d`)
+
+This is different from the overlap model — it extracts tile-level adjacency, not overlapping pattern windows. The output is a standard ruleset suitable for `solve_wfc()`.
+
+## `WfcTileGrid` Utility Methods
+
+| Method | Effect |
+| --- | --- |
+| `new_empty(topology, size)` | Create a blank grid filled with `WfcTileId(0)` |
+| `set_tile_at(position, tile)` | Set the tile at a position (no-op if out of bounds) |
+| `set_variant_at(position, variant)` | Set tile + rotation at a position |
+| `iter()` | Iterate `(UVec3, WfcTileId)` over all cells |
+| `iter_variants()` | Iterate `(UVec3, WfcTileVariant)` over all cells |
+| `width()`, `height()`, `depth()` | Convenience accessors for grid dimensions |
+
+## Serde Support
+
+All public types implement `serde::Serialize` and `serde::Deserialize`. This enables:
+
+- **Data-driven rulesets**: load `WfcRuleset` from RON, JSON, TOML, or any serde format
+- **Save/load**: serialize `WfcSolution`, `WfcRequest`, or `WfcTileGrid` for persistence
+- **Editor tooling**: exchange WFC configurations with external tools
+- **Debugging**: dump requests or solutions as readable text for inspection
+
+The `serde` dependency is always included (not behind a feature flag) since `publish = false`.
