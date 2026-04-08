@@ -1,7 +1,10 @@
-use bevy::platform::time::Instant;
-
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use crate::{
     WfcCellBans, WfcCellDebug, WfcContradiction, WfcDebugSnapshot, WfcFailure, WfcFailureReason,
