@@ -76,6 +76,14 @@ fn wait_for_view(view: LabView, state: LabSolveState) -> Action {
     }
 }
 
+fn wait_for_solved_view(view: LabView) -> Action {
+    wait_for_view(view, LabSolveState::Solved)
+}
+
+fn wait_for_failed_view(view: LabView) -> Action {
+    wait_for_view(view, LabSolveState::Failed)
+}
+
 fn wait_for_new_signature(view: LabView) -> Action {
     Action::WaitUntil {
         label: format!("wait for new {view:?} signature"),
@@ -151,7 +159,7 @@ fn wfc_smoke() -> Scenario {
             "Verify the default basic view solves and publishes diagnostics plus a visible grid.",
         )
         .then(Action::WaitFrames(10))
-        .then(wait_for_view(LabView::Basic, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Basic))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "basic view solved",
             |diagnostics| diagnostics.signature != 0 && diagnostics.visible_cells > 0,
@@ -177,7 +185,7 @@ fn wfc_views() -> Scenario {
         .then(Action::Screenshot("wfc_room".into()))
         .then(Action::WaitFrames(1))
         .then(switch_view(LabView::Contradiction))
-        .then(wait_for_view(LabView::Contradiction, LabSolveState::Failed))
+        .then(wait_for_failed_view(LabView::Contradiction))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "contradiction view exposes failure diagnostics",
             |diagnostics| {
@@ -199,7 +207,7 @@ fn wfc_regeneration() -> Scenario {
             "Regenerate the basic view with a new seed and verify the published signature changes.",
         )
         .then(switch_view(LabView::Basic))
-        .then(wait_for_view(LabView::Basic, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Basic))
         .then(remember_signature())
         .then(regenerate())
         .then(wait_for_new_signature(LabView::Basic))
@@ -265,7 +273,7 @@ fn wfc_async_large() -> Scenario {
         .then(inspect::log_resource::<LabDiagnostics>("large running diagnostics"))
         .then(Action::Screenshot("wfc_large_running".into()))
         .then(Action::WaitFrames(1))
-        .then(wait_for_view(LabView::Large, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Large))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "large view eventually solves",
             |diagnostics| {
@@ -397,7 +405,7 @@ fn wfc_contradiction_debug_snapshot() -> Scenario {
             "Verify that when a solve fails with Contradiction and capture_debug_snapshot is enabled, the failure exposes: reason=Contradiction, zero_domain_cells >= 1 (the contradiction site), ambiguous_cells > 0 (partially propagated), and a non-None contradiction_position.",
         )
         .then(switch_view(LabView::Contradiction))
-        .then(wait_for_view(LabView::Contradiction, LabSolveState::Failed))
+        .then(wait_for_failed_view(LabView::Contradiction))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "failure reason is Contradiction",
             |diagnostics| {
@@ -440,7 +448,7 @@ fn wfc_seed_determinism() -> Scenario {
         )
         // First solve at seed 7.
         .then(switch_view(LabView::Basic))
-        .then(wait_for_view(LabView::Basic, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Basic))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "first solve produces a valid signature",
             |diagnostics| {
@@ -461,7 +469,7 @@ fn wfc_seed_determinism() -> Scenario {
         .then(switch_view(LabView::Basic))
         // Use wait_for_view (not wait_for_new_signature) because the signature
         // IS expected to equal the first run — we just wait for Solved state.
-        .then(wait_for_view(LabView::Basic, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Basic))
         // Assert the second signature matches the first (saved before the
         // Stitched detour). We read both from the world directly.
         .then(Action::Custom(Box::new(|world| {
@@ -821,13 +829,13 @@ fn wfc_keyboard_workflow() -> Scenario {
             "Drive the lab through its keyboard shortcuts, switching views and triggering a regeneration so the interactive controls are covered through the public input path.",
         )
         .then(Action::WaitFrames(20))
-        .then(wait_for_view(LabView::Basic, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Basic))
         .then(Action::Screenshot("wfc_keyboard_basic".into()))
         .then(Action::HoldKey {
             key: KeyCode::Digit2,
             frames: 1,
         })
-        .then(wait_for_view(LabView::Room, LabSolveState::Solved))
+        .then(wait_for_solved_view(LabView::Room))
         .then(assertions::resource_satisfies::<LabDiagnostics>(
             "room view is active",
             |diagnostics| diagnostics.active_view == LabView::Room && diagnostics.visible_cells > 0,
